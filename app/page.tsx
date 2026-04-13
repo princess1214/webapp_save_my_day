@@ -103,6 +103,7 @@ export default function WelcomePage() {
 
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const themeMode = appPreferences?.themeMode ?? "system";
 
@@ -146,7 +147,8 @@ export default function WelcomePage() {
     Boolean(birthday) &&
     !isUnder13 &&
     Boolean(resolvedRole) &&
-    Boolean(displayName.trim());
+    Boolean(displayName.trim()) &&
+    acceptedTerms;
 
   function clearMessages() {
     setErrorMessage("");
@@ -218,6 +220,11 @@ export default function WelcomePage() {
       return;
     }
 
+    if (!acceptedTerms) {
+      setErrorMessage("Please agree to the Terms and Privacy Policy.");
+      return;
+    }
+
     updateProfile?.({
       displayName: displayName.trim(),
       firstName: displayName.trim(),
@@ -232,9 +239,19 @@ export default function WelcomePage() {
       "demo_user_email",
       email.trim().toLowerCase()
     );
+    const mailboxRaw = localStorage.getItem("demo_mailbox");
+    const mailbox = mailboxRaw ? JSON.parse(mailboxRaw) : [];
+    mailbox.unshift({
+      id: `welcome-${Date.now()}`,
+      to: email.trim().toLowerCase(),
+      subject: "Welcome to Nestli 💚",
+      body: `Hi ${displayName.trim() || "there"}, welcome to Nestli! We're glad you're here.`,
+      createdAt: new Date().toISOString(),
+    });
+    localStorage.setItem("demo_mailbox", JSON.stringify(mailbox));
 
     upsertBirthdayEvent();
-    setSuccessMessage("Family account created.");
+    setSuccessMessage("Family account created. A welcome email was sent to your mailbox.");
     window.setTimeout(() => {
       router.push("/home");
     }, 500);
@@ -331,6 +348,36 @@ export default function WelcomePage() {
             </div>
           </div>
         </section>
+
+        <label
+          className={cn(
+            "mt-4 flex items-start gap-2 rounded-2xl border px-3 py-3 text-sm",
+            isDarkMode
+              ? "border-slate-700 bg-slate-900 text-slate-300"
+              : "border-slate-200 bg-white text-slate-600"
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => {
+              clearMessages();
+              setAcceptedTerms(e.target.checked);
+            }}
+            className="mt-1"
+          />
+          <span>
+            I have read and agree to the{" "}
+            <Link href="/terms" className="underline">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline">
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
 
         <section className="space-y-4">
           <Field label="Your name" darkMode={isDarkMode}>

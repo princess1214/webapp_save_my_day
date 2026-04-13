@@ -1,5 +1,6 @@
 const STORAGE_KEY = "demo_user";
 const SESSION_KEY = "demo_session";
+const MAILBOX_KEY = "demo_mailbox";
 
 export type SessionUser = {
   email: string;
@@ -39,8 +40,18 @@ export async function signup(payload: {
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
   localStorage.setItem(SESSION_KEY, "true");
+  const mailboxRaw = localStorage.getItem(MAILBOX_KEY);
+  const mailbox = mailboxRaw ? JSON.parse(mailboxRaw) : [];
+  mailbox.unshift({
+    id: `welcome-${Date.now()}`,
+    to: user.email,
+    subject: "Welcome to Nestli 💚",
+    body: `Hi ${user.fullName || "there"}, welcome to Nestli! We're glad you're here.`,
+    createdAt: new Date().toISOString(),
+  });
+  localStorage.setItem(MAILBOX_KEY, JSON.stringify(mailbox));
 
-  return { success: true, user };
+  return { success: true, user, welcomeEmailQueued: true };
 }
 
 export async function login(payload: { email: string; password: string }) {
