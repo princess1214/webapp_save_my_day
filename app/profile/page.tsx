@@ -503,8 +503,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F7F8FA] text-slate-900">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm">
+    <main className="min-h-screen bg-[#F7F8FA] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm dark:bg-slate-900">
         {screen === "main" && renderHeader("Profile")}
         {screen === "account" && renderHeader("Account", true)}
         {screen === "notifications" && renderHeader("Notification", true)}
@@ -670,6 +670,28 @@ export default function ProfilePage() {
                     }}
                   />
                 </div>
+              </section>
+
+              <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Legal & support</div>
+                <Link
+                  href="/terms"
+                  className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                >
+                  Terms of Service
+                </Link>
+                <Link
+                  href="/privacy"
+                  className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                >
+                  Privacy Policy
+                </Link>
+                <Link
+                  href="/report-issue"
+                  className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                >
+                  Report an issue
+                </Link>
               </section>
             </div>
           ) : null}

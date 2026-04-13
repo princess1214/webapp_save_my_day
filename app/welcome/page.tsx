@@ -15,7 +15,9 @@ export default function WelcomePage() {
     role: '',
   });
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const onChange = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -25,9 +27,13 @@ export default function WelcomePage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setInfo('');
 
     try {
-      await signup(form);
+      const res = await signup(form);
+      if (res?.welcomeEmailQueued) {
+        setInfo('Welcome message was sent to your mailbox (demo).');
+      }
       router.push('/home');
     } catch (err: any) {
       setError(err.message);
@@ -37,8 +43,8 @@ export default function WelcomePage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center">
-      <div className="w-[380px] border rounded-2xl p-6">
+    <main className="min-h-screen flex items-center justify-center dark:bg-slate-950">
+      <div className="w-[380px] border rounded-2xl p-6 bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100">
         <h1 className="text-2xl font-semibold">Create account</h1>
 
         <form onSubmit={onSubmit} className="mt-4 space-y-3">
@@ -75,9 +81,34 @@ export default function WelcomePage() {
             onChange={(e) => onChange('role', e.target.value)}
           />
 
-          {error && <div className="text-red-500 text-sm">{error}</div>}
+          <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-1"
+              required
+            />
+            <span>
+              I have read and agree to the{' '}
+              <Link href="/terms" className="underline">
+                Terms
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="underline">
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
 
-          <button className="w-full bg-black text-white py-2 rounded">
+          {error && <div className="text-red-500 text-sm">{error}</div>}
+          {info && <div className="text-emerald-600 text-sm">{info}</div>}
+
+          <button
+            disabled={!acceptedTerms || loading}
+            className="w-full bg-black text-white py-2 rounded disabled:cursor-not-allowed disabled:opacity-50"
+          >
             {loading ? 'Creating...' : 'Create account'}
           </button>
         </form>
