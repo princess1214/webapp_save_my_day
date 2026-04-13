@@ -187,7 +187,7 @@ export default function HealthPage() {
 
   return (
     <main className="min-h-screen bg-[#F7F8FA] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="mx-auto relative flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm dark:bg-slate-900">
+      <div className="app-themed mx-auto relative flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm dark:bg-slate-900">
         
         {/* 1. Header (Unified with Profile) */}
         <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 px-4 pb-3 pt-4 backdrop-blur flex justify-between items-end">

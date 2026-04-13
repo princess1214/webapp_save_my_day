@@ -504,7 +504,7 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-[#F7F8FA] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm dark:bg-slate-900">
+      <div className="app-themed mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm dark:bg-slate-900">
         {screen === "main" && renderHeader("Profile")}
         {screen === "account" && renderHeader("Account", true)}
         {screen === "notifications" && renderHeader("Notification", true)}
