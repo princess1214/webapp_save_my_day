@@ -148,6 +148,7 @@ export default function WelcomePage() {
     !isUnder13 &&
     Boolean(resolvedRole) &&
     Boolean(displayName.trim()) &&
+    !emailExists &&
     acceptedTerms;
 
   function clearMessages() {
@@ -188,6 +189,11 @@ export default function WelcomePage() {
 
     if (!isValidEmail(email)) {
       setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+
+    if (emailExists) {
+      setErrorMessage("This email already has an account. Please sign in instead.");
       return;
     }
 
@@ -349,35 +355,6 @@ export default function WelcomePage() {
           </div>
         </section>
 
-        <label
-          className={cn(
-            "mt-4 flex items-start gap-2 rounded-2xl border px-3 py-3 text-sm",
-            isDarkMode
-              ? "border-slate-700 bg-slate-900 text-slate-300"
-              : "border-slate-200 bg-white text-slate-600"
-          )}
-        >
-          <input
-            type="checkbox"
-            checked={acceptedTerms}
-            onChange={(e) => {
-              clearMessages();
-              setAcceptedTerms(e.target.checked);
-            }}
-            className="mt-1"
-          />
-          <span>
-            I have read and agree to the{" "}
-            <Link href="/terms" className="underline">
-              Terms
-            </Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="underline">
-              Privacy Policy
-            </Link>
-            .
-          </span>
-        </label>
 
         <section className="space-y-4">
           <Field label="Your name" darkMode={isDarkMode}>
@@ -569,6 +546,37 @@ export default function WelcomePage() {
             {successMessage}
           </div>
         ) : null}
+
+        <label
+          className={cn(
+            "mt-6 flex items-start gap-2 rounded-2xl border px-3 py-3 text-sm",
+            isDarkMode
+              ? "border-slate-700 bg-slate-900 text-slate-300"
+              : "border-slate-200 bg-white text-slate-600"
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => {
+              clearMessages();
+              setAcceptedTerms(e.target.checked);
+            }}
+            className="mt-1"
+          />
+          <span>
+            I have read and agree to the{" "}
+            <Link href="/terms" className="underline">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline">
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+
 
         <button
           type="button"
