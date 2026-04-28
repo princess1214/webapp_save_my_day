@@ -15,6 +15,7 @@ type CalendarEvent = {
   title: string;
   date: string;
   time: string;
+  allDay?: boolean;
   durationMinutes?: number;
   category: EventCategory;
   memberIds: string[];
@@ -205,6 +206,8 @@ export default function HomePage() {
   const [quickLogText, setQuickLogText] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
+  const [dailyCheerMessage, setDailyCheerMessage] = useState("");
+  const [weatherSummary, setWeatherSummary] = useState("");
 
   const prefs = {
     showPinnedEvents: appPreferences?.showPinnedEvents ?? true,
@@ -245,6 +248,60 @@ export default function HomePage() {
         return () => mq.removeListener(handler);
       }
     }
+  }, []);
+
+  useEffect(() => {
+    const cheers = [
+      "You are powerful today.",
+      "You have done great already.",
+      "Earth cannot spin without you.",
+      "Hang in there, you're doing amazing.",
+      "You're the warm heart of this home.",
+      "Tiny steps still count as giant wins.",
+      "Your care makes every day brighter.",
+    ];
+    const dayOfYear = Math.floor(
+      (new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) /
+        86400000
+    );
+    setDailyCheerMessage(cheers[dayOfYear % cheers.length]);
+  }, []);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setWeatherSummary("Weather unavailable: location permission not granted.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `/api/weather?lat=${latitude}&lon=${longitude}`,
+            { cache: "no-store" }
+          );
+          if (!res.ok) {
+            setWeatherSummary("Weather unavailable right now.");
+            return;
+          }
+          const data = await res.json();
+          const current = data?.current;
+          if (!current) {
+            setWeatherSummary("Weather unavailable right now.");
+            return;
+          }
+          const temp = Math.round(current.temperature_2m);
+          const rainChance = Number(current.precipitation_probability || 0);
+          const outlook = rainChance >= 50 ? "Rain likely" : "Mostly sunny";
+          setWeatherSummary(`${temp}°C · ${outlook} · Rain chance ${rainChance}%`);
+        } catch {
+          setWeatherSummary("Weather unavailable right now.");
+        }
+      },
+      () => setWeatherSummary("Weather unavailable: location permission denied."),
+      { timeout: 8000 }
+    );
   }, []);
 
   const isDarkMode =
@@ -409,6 +466,9 @@ export default function HomePage() {
               <p className={cn("mt-1 text-sm", isDarkMode ? "text-slate-400" : "text-slate-400")}>
                 {dateLabel}
               </p>
+              <p className={cn("mt-2 text-xs font-medium", isDarkMode ? "text-sky-300" : "text-sky-600")}>
+                {weatherSummary || "Loading local weather..."}
+              </p>
             </div>
 
             <div className="flex items-center">
@@ -506,6 +566,16 @@ export default function HomePage() {
           </section>
 
           <section className="mb-6">
+            <div
+              className={cn(
+                "mb-3 rounded-2xl border px-4 py-3 text-sm font-medium",
+                isDarkMode
+                  ? "border-violet-500/20 bg-violet-500/10 text-violet-200"
+                  : "border-violet-100 bg-violet-50 text-violet-700"
+              )}
+            >
+              💜 {dailyCheerMessage}
+            </div>
             <div
               onClick={() => setShowQuickLogSheet(true)}
               className={cn(
@@ -681,7 +751,11 @@ export default function HomePage() {
                             isDarkMode ? "text-slate-400" : "text-slate-400"
                           )}
                         >
-                          {event.date === todayKey
+                          {event.allDay
+                            ? event.date === todayKey
+                              ? "All day"
+                              : `${formatFriendlyDate(event.date, prefs.dateFormat)} · All day`
+                            : event.date === todayKey
                             ? formatDisplayTime(event.time, prefs.timeFormat)
                             : `${formatFriendlyDate(event.date, prefs.dateFormat)} · ${formatDisplayTime(
                                 event.time,

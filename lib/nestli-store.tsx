@@ -43,6 +43,7 @@ export type CalendarEvent = {
   title: string;
   date: string;
   time: string;
+  allDay?: boolean;
   durationMinutes?: number;
   category: EventCategory;
   memberIds: string[];
@@ -224,7 +225,74 @@ function normalizeFamilyMembers(
   return [allMember, selfMember, ...others];
 }
 const defaultFamilyMembers: FamilyMember[] = normalizeFamilyMembers(defaultProfile, []);
-const defaultEvents: CalendarEvent[] = [];
+function nthWeekdayOfMonth(
+  year: number,
+  monthIndex: number,
+  weekday: number,
+  occurrence: number
+) {
+  const first = new Date(year, monthIndex, 1);
+  const shift = (7 + weekday - first.getDay()) % 7;
+  return new Date(year, monthIndex, 1 + shift + (occurrence - 1) * 7);
+}
+
+function lastWeekdayOfMonth(year: number, monthIndex: number, weekday: number) {
+  const lastDay = new Date(year, monthIndex + 1, 0);
+  const shift = (7 + lastDay.getDay() - weekday) % 7;
+  return new Date(year, monthIndex, lastDay.getDate() - shift);
+}
+
+function buildUSFederalHolidayEvents(year: number): CalendarEvent[] {
+  const holidayDefs = [
+    { title: "New Year's Day", date: new Date(year, 0, 1) },
+    { title: "Martin Luther King Jr. Day", date: nthWeekdayOfMonth(year, 0, 1, 3) },
+    { title: "Washington's Birthday", date: nthWeekdayOfMonth(year, 1, 1, 3) },
+    { title: "Memorial Day", date: lastWeekdayOfMonth(year, 4, 1) },
+    { title: "Juneteenth National Independence Day", date: new Date(year, 5, 19) },
+    { title: "Independence Day", date: new Date(year, 6, 4) },
+    { title: "Labor Day", date: nthWeekdayOfMonth(year, 8, 1, 1) },
+    { title: "Columbus Day", date: nthWeekdayOfMonth(year, 9, 1, 2) },
+    { title: "Veterans Day", date: new Date(year, 10, 11) },
+    { title: "Thanksgiving Day", date: nthWeekdayOfMonth(year, 10, 4, 4) },
+    { title: "Christmas Day", date: new Date(year, 11, 25) },
+  ];
+
+  return holidayDefs.map((holiday) => {
+    const y = holiday.date.getFullYear();
+    const m = String(holiday.date.getMonth() + 1).padStart(2, "0");
+    const d = String(holiday.date.getDate()).padStart(2, "0");
+    return {
+      id: `us-fed-${y}-${m}-${d}`,
+      title: holiday.title,
+      date: `${y}-${m}-${d}`,
+      time: "00:00",
+      allDay: true,
+      durationMinutes: 1440,
+      category: "event" as const,
+      memberIds: [ALL_MEMBER_ID],
+      notes: "US federal holiday.",
+      pinned: false,
+      importance: "normal" as const,
+      recurrence: "do-not-repeat" as const,
+      reminderMinutes: "1440",
+    };
+  });
+}
+
+function withFederalHolidays(baseEvents: CalendarEvent[] = []) {
+  const currentYear = new Date().getFullYear();
+  const holidayEvents = [
+    ...buildUSFederalHolidayEvents(currentYear),
+    ...buildUSFederalHolidayEvents(currentYear + 1),
+  ];
+  const map = new Map<string, CalendarEvent>();
+  [...holidayEvents, ...baseEvents].forEach((event) => {
+    map.set(event.id, event);
+  });
+  return Array.from(map.values());
+}
+
+const defaultEvents: CalendarEvent[] = withFederalHolidays([]);
 
 const defaultJournalPosts: JournalPost[] = [
 ];
@@ -717,7 +785,7 @@ export const useNestliStore = create<NestliStore>()(
           ...typedPersisted,
           profile: mergedProfile,
           familyMembers: mergedFamilyMembers,
-          events: typedPersisted.events || typedCurrent.events,
+          events: withFederalHolidays(typedPersisted.events || typedCurrent.events),
           journalPosts: typedPersisted.journalPosts || typedCurrent.journalPosts,
           healthRecords: typedPersisted.healthRecords || typedCurrent.healthRecords,
           appPreferences: {

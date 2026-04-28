@@ -7,10 +7,51 @@ export type SessionUser = {
   fullName?: string;
   birthday?: string;
   role?: string;
+  accountNumber?: string;
+};
+
+type LoginContext = {
+  userAgent?: string;
+  ip?: string | null;
+  location?: string;
+  loggedAt: string;
 };
 
 function delay(ms = 500) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function generateAccountNumber() {
+  const stamp = Date.now().toString().slice(-8);
+  const rand = Math.floor(Math.random() * 9000 + 1000);
+  return `NST-${stamp}-${rand}`;
+}
+
+async function fetchLoginContext(): Promise<LoginContext> {
+  try {
+    const res = await fetch("/api/auth/context", { cache: "no-store" });
+    if (!res.ok) {
+      return {
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "Unknown device",
+        location: "Unknown location",
+        loggedAt: new Date().toISOString(),
+      };
+    }
+
+    const data = await res.json();
+    return {
+      userAgent: data.userAgent,
+      ip: data.ip,
+      location: data.location,
+      loggedAt: new Date().toISOString(),
+    };
+  } catch {
+    return {
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "Unknown device",
+      location: "Unknown location",
+      loggedAt: new Date().toISOString(),
+    };
+  }
 }
 
 export async function signup(payload: {
@@ -30,12 +71,16 @@ export async function signup(payload: {
     }
   }
 
+  const accountNumber = generateAccountNumber();
+
   const user = {
     email: payload.email.toLowerCase(),
     fullName: payload.fullName,
     birthday: payload.birthday,
     role: payload.role,
     password: payload.password,
+    accountNumber,
+    loginHistory: [] as LoginContext[],
   };
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
@@ -45,8 +90,8 @@ export async function signup(payload: {
   mailbox.unshift({
     id: `welcome-${Date.now()}`,
     to: user.email,
-    subject: "Welcome to Nestli 💚",
-    body: `Hi ${user.fullName || "there"}, welcome to Nestli! We're glad you're here.`,
+    subject: "Welcome to Nestli",
+    body: `Hi ${user.fullName || "there"},\n\nWelcome to Nestli 💚 We're so happy you are here.\n\nLog in anytime: ${typeof window !== "undefined" ? `${window.location.origin}/login` : "/login"}\n\nYour account number: ${accountNumber}\n\nWarmly,\nNestli Team`,
     createdAt: new Date().toISOString(),
   });
   localStorage.setItem(MAILBOX_KEY, JSON.stringify(mailbox));
@@ -69,9 +114,35 @@ export async function login(payload: { email: string; password: string }) {
     throw new Error("Invalid email or passcode");
   }
 
+  const context = await fetchLoginContext();
+  const loginHistory = (user.loginHistory || []) as LoginContext[];
+  const previous = loginHistory[0];
+
+  if (
+    previous &&
+    (previous.userAgent !== context.userAgent || previous.location !== context.location)
+  ) {
+    const mailboxRaw = localStorage.getItem(MAILBOX_KEY);
+    const mailbox = mailboxRaw ? JSON.parse(mailboxRaw) : [];
+    mailbox.unshift({
+      id: `security-${Date.now()}`,
+      to: user.email,
+      subject: "Nestli security alert: New login detected",
+      body: `We noticed a login from a new device/location.\n\nPrevious: ${previous.userAgent} @ ${previous.location}\nCurrent: ${context.userAgent} @ ${context.location}\n\nIf this wasn't you, please change your password now.`,
+      createdAt: new Date().toISOString(),
+    });
+    localStorage.setItem(MAILBOX_KEY, JSON.stringify(mailbox));
+  }
+
+  const updatedUser = {
+    ...user,
+    loginHistory: [context, ...loginHistory].slice(0, 12),
+  };
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
   localStorage.setItem(SESSION_KEY, "true");
 
-  return { success: true, user };
+  return { success: true, user: updatedUser };
 }
 
 export async function logout() {
