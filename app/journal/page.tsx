@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNestliStore } from "../../lib/nestli-store";
 
 type MomentCategory =
@@ -242,6 +242,18 @@ export default function JournalPage() {
       })
       .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   }, [journalPosts, displayName, searchTerm]);
+
+  useEffect(() => {
+    if (!selectedPost) return;
+    const fresh = (journalPosts as JournalPost[]).find(
+      (post) => post.id === selectedPost.id
+    );
+    if (!fresh) {
+      setSelectedPost(null);
+      return;
+    }
+    setSelectedPost(fresh);
+  }, [journalPosts, selectedPost]);
 
   function resetComposer(mode: JournalView) {
     const defaultMember = actualFamilyMembers[0]?.id ?? "emma";

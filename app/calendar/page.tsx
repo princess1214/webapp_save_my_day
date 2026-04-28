@@ -18,6 +18,7 @@ type CalendarEvent = {
   title: string;
   date: string;
   time: string;
+  allDay?: boolean;
   durationMinutes?: number;
   category: EventCategory;
   memberIds: string[];
@@ -30,6 +31,15 @@ type CalendarEvent = {
   recurrenceDays?: string[];
   recurrenceEveryHours?: string;
   reminderMinutes?: string;
+};
+
+type VisionExtractResult = {
+  provider: string;
+  title?: string;
+  notes?: string;
+  extractedDate?: string;
+  extractedTime?: string;
+  extractedLocation?: string;
 };
 
 type FamilyMember = {
@@ -71,6 +81,34 @@ function formatDisplayTime(
   const suffix = h >= 12 ? "PM" : "AM";
   const hour = h % 12 === 0 ? 12 : h % 12;
   return `${hour}:${String(m).padStart(2, "0")} ${suffix}`;
+}
+
+function normalizeExtractedDate(input: string) {
+  if (!input) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+  const parts = input.split("/").map((part) => Number(part));
+  if (parts.length < 2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) {
+    return "";
+  }
+  const [month, day, yearRaw] = parts;
+  const year = yearRaw ? (yearRaw < 100 ? 2000 + yearRaw : yearRaw) : new Date().getFullYear();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function normalizeExtractedTime(input: string) {
+  if (!input) return "";
+  const trimmed = input.trim();
+  const ampmMatch = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (ampmMatch) {
+    let hour = Number(ampmMatch[1]);
+    const minute = Number(ampmMatch[2] || "0");
+    const suffix = ampmMatch[3].toUpperCase();
+    if (suffix === "PM" && hour < 12) hour += 12;
+    if (suffix === "AM" && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+  return "";
 }
 
 function formatFriendlyDate(
@@ -238,6 +276,7 @@ export default function CalendarPage() {
   const [newDate, setNewDate] = useState(todayKey);
   const [newTime, setNewTime] = useState("09:00");
   const [newDurationMinutes, setNewDurationMinutes] = useState("60");
+  const [newAllDay, setNewAllDay] = useState(false);
   const [newCategory, setNewCategory] = useState<EventCategory>("event");
   const [newMemberIds, setNewMemberIds] = useState<string[]>([]);
   const [newLocation, setNewLocation] = useState("");
@@ -255,6 +294,11 @@ export default function CalendarPage() {
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState("");
+  const [visionExtracting, setVisionExtracting] = useState(false);
+  const [visionMessage, setVisionMessage] = useState("");
+  const [visionUsageRemaining, setVisionUsageRemaining] = useState(3);
+  const [visionFreezeUntil, setVisionFreezeUntil] = useState<string | null>(null);
 
   const prefs = {
     themeMode: appPreferences?.themeMode ?? "system",
@@ -280,6 +324,48 @@ export default function CalendarPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = localStorage.getItem("nestli_vision_usage");
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw) as { count: number; freezeUntil?: string };
+      const freezeActive = data.freezeUntil && new Date(data.freezeUntil).getTime() > Date.now();
+      setVisionUsageRemaining(freezeActive ? 0 : Math.max(0, 3 - (data.count || 0)));
+      setVisionFreezeUntil(freezeActive ? data.freezeUntil || null : null);
+    } catch {
+      // ignore invalid local usage cache
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showCreateSheet) return;
+    const q = addressQuery.trim();
+    if (q.length < 3) {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setIsSearchingAddress(true);
+      try {
+        const res = await fetch(`/api/calendar/address-suggest?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const suggestions = (data?.suggestions || []) as string[];
+        setAddressSuggestions(suggestions);
+        setShowAddressSuggestions(suggestions.length > 0);
+      } catch {
+        setAddressSuggestions([]);
+        setShowAddressSuggestions(false);
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [addressQuery, showCreateSheet]);
 
   const isDarkMode =
     prefs.themeMode === "dark" ||
@@ -362,6 +448,7 @@ export default function CalendarPage() {
     setNewDate(selectedDate);
     setNewTime("09:00");
     setNewDurationMinutes("60");
+    setNewAllDay(false);
     setNewCategory("event");
     setNewMemberIds(
       selectedMemberId !== "all" && selectedMemberId ? [selectedMemberId] : []
@@ -375,6 +462,11 @@ export default function CalendarPage() {
     setNewRecurrenceDays([]);
     setNewRecurrenceEveryHours("");
     setNewReminderMinutes("60");
+    setAddressQuery("");
+    setAddressSuggestions([]);
+    setShowAddressSuggestions(false);
+    setUploadPreview("");
+    setVisionMessage("");
   }
 
   function openCreateEvent() {
@@ -391,6 +483,7 @@ export default function CalendarPage() {
     setNewDate(event.date);
     setNewTime(event.time || "09:00");
     setNewDurationMinutes(String(event.durationMinutes || 60));
+    setNewAllDay(Boolean(event.allDay));
     setNewCategory(event.category);
     setNewMemberIds(event.memberIds.filter((id) => id !== "all"));
     setNewLocation(event.location || "");
@@ -402,7 +495,86 @@ export default function CalendarPage() {
     setNewRecurrenceDays(event.recurrenceDays || []);
     setNewRecurrenceEveryHours(event.recurrenceEveryHours || "");
     setNewReminderMinutes(event.reminderMinutes || "60");
+    setAddressQuery(event.location || "");
+    setShowAddressSuggestions(false);
     setShowCreateSheet(true);
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      setUploadPreview(result);
+      setVisionMessage("Image ready. Tap “Read event from image”.");
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleReadEventFromImage() {
+    if (!uploadPreview) {
+      setVisionMessage("Please upload an image first.");
+      return;
+    }
+
+    if (visionFreezeUntil && new Date(visionFreezeUntil).getTime() > Date.now()) {
+      setVisionMessage(`Image reading is frozen until ${new Date(visionFreezeUntil).toLocaleString()}.`);
+      return;
+    }
+
+    if (visionUsageRemaining <= 0) {
+      const freezeUntil = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
+      localStorage.setItem("nestli_vision_usage", JSON.stringify({ count: 3, freezeUntil }));
+      setVisionFreezeUntil(freezeUntil);
+      setVisionMessage(`Usage limit reached. Try again after ${new Date(freezeUntil).toLocaleTimeString()}.`);
+      return;
+    }
+
+    setVisionExtracting(true);
+    setVisionMessage("");
+    try {
+      const res = await fetch("/api/calendar/vision-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageDataUrl: uploadPreview }),
+      });
+      const data = (await res.json()) as VisionExtractResult;
+
+      if (data.title) setNewTitle(data.title);
+      if (data.notes) setNewNotes(data.notes);
+      if (data.extractedLocation) {
+        setNewLocation(data.extractedLocation);
+        setAddressQuery(data.extractedLocation);
+      }
+      const date = normalizeExtractedDate(data.extractedDate || "");
+      if (date) setNewDate(date);
+      const time = normalizeExtractedTime(data.extractedTime || "");
+      if (time) setNewTime(time);
+      setNewRecurrence("do-not-repeat");
+
+      const currentRaw = localStorage.getItem("nestli_vision_usage");
+      const current = currentRaw ? JSON.parse(currentRaw) : { count: 0 };
+      const nextCount = (current.count || 0) + 1;
+      const nextRemaining = Math.max(0, 3 - nextCount);
+      const freezeUntil = nextCount >= 3 ? new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() : null;
+      localStorage.setItem(
+        "nestli_vision_usage",
+        JSON.stringify({ count: nextCount >= 3 ? 3 : nextCount, freezeUntil })
+      );
+      setVisionUsageRemaining(nextRemaining);
+      setVisionFreezeUntil(freezeUntil);
+
+      setVisionMessage(
+        nextRemaining > 0
+          ? `Event details extracted. ${nextRemaining} image read(s) left this cycle.`
+          : "Event details extracted. Limit reached, 4-hour freeze has started."
+      );
+    } catch {
+      setVisionMessage("We couldn't read this image. Please try another image.");
+    } finally {
+      setVisionExtracting(false);
+    }
   }
 
   function toggleMemberForEvent(memberId: string) {
@@ -422,7 +594,7 @@ export default function CalendarPage() {
   function handleSaveEvent() {
     if (!newTitle.trim()) return;
     if (!newDate) return;
-    if (!newTime) return;
+    if (!newAllDay && !newTime) return;
 
     const baseId =
       formMode === "edit" && editingEventId
@@ -433,8 +605,9 @@ export default function CalendarPage() {
       id: baseId,
       title: newTitle.trim(),
       date: newDate,
-      time: newTime,
-      durationMinutes: Number(newDurationMinutes) || 60,
+      time: newAllDay ? "00:00" : newTime,
+      durationMinutes: newAllDay ? 1440 : Number(newDurationMinutes) || 60,
+      allDay: newAllDay,
       category: newCategory,
       memberIds: newMemberIds.length > 0 ? newMemberIds : ["all"],
       notes: newNotes.trim(),
@@ -610,8 +783,11 @@ export default function CalendarPage() {
                 isDarkMode ? "text-slate-400" : "text-slate-500"
               )}
             >
-              {formatDisplayTime(event.time, prefs.timeFormat)}
-              {event.durationMinutes ? ` · ${event.durationMinutes} min` : ""}
+              {event.allDay
+                ? "All day"
+                : `${formatDisplayTime(event.time, prefs.timeFormat)}${
+                    event.durationMinutes ? ` · ${event.durationMinutes} min` : ""
+                  }`}
             </p>
 
             <p
@@ -1231,14 +1407,24 @@ export default function CalendarPage() {
                       type="time"
                       value={newTime}
                       onChange={(e) => setNewTime(e.target.value)}
+                      disabled={newAllDay}
                       className={cn(
                         inputClass,
+                        newAllDay && "cursor-not-allowed opacity-60",
                         isDarkMode &&
                           "border-slate-800 bg-slate-900 text-slate-100 focus:bg-slate-900"
                       )}
                     />
                   </Field>
                 </div>
+
+                <ToggleRow
+                  title="All-day event"
+                  subtitle="Useful for holidays and dates without a specific time"
+                  checked={newAllDay}
+                  onChange={setNewAllDay}
+                  darkMode={isDarkMode}
+                />
 
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Duration (min)" darkMode={isDarkMode}>
@@ -1247,8 +1433,10 @@ export default function CalendarPage() {
                       min={0}
                       value={newDurationMinutes}
                       onChange={(e) => setNewDurationMinutes(e.target.value)}
+                      disabled={newAllDay}
                       className={cn(
                         inputClass,
+                        newAllDay && "cursor-not-allowed opacity-60",
                         isDarkMode &&
                           "border-slate-800 bg-slate-900 text-slate-100 focus:bg-slate-900"
                       )}
@@ -1403,9 +1591,14 @@ export default function CalendarPage() {
                 ) : null}
 
                 <Field label="Location" darkMode={isDarkMode}>
+                  <div className="space-y-2">
                   <input
-                    value={newLocation}
-                    onChange={(e) => setNewLocation(e.target.value)}
+                    value={addressQuery}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setAddressQuery(value);
+                      setNewLocation(value);
+                    }}
                     placeholder="Clinic, school, home..."
                     className={cn(
                       inputClass,
@@ -1413,6 +1606,27 @@ export default function CalendarPage() {
                         "border-slate-800 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:bg-slate-900"
                     )}
                   />
+                    {isSearchingAddress ? (
+                      <p className="text-xs text-slate-400">Searching addresses...</p>
+                    ) : null}
+                    {showAddressSuggestions ? (
+                      <div className={cn("rounded-2xl border p-2", isDarkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white")}>
+                        {addressSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            onClick={() => {
+                              setNewLocation(suggestion);
+                              setAddressQuery(suggestion);
+                              setShowAddressSuggestions(false);
+                            }}
+                            className={cn("w-full rounded-xl px-3 py-2 text-left text-xs", isDarkMode ? "hover:bg-slate-800" : "hover:bg-slate-50")}
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </Field>
 
                 <Field label="Notes" darkMode={isDarkMode}>
@@ -1427,6 +1641,28 @@ export default function CalendarPage() {
                         : "border-slate-200 bg-slate-50 text-slate-800 focus:bg-white"
                     )}
                   />
+                </Field>
+
+                <Field label="Event image (optional)" darkMode={isDarkMode}>
+                  <div className="space-y-3">
+                    <input type="file" accept="image/*" onChange={handleImageUpload} />
+                    {uploadPreview ? (
+                      <img src={uploadPreview} alt="Event upload preview" className="h-28 w-full rounded-2xl border border-slate-200 object-cover" />
+                    ) : null}
+                    <button
+                      onClick={handleReadEventFromImage}
+                      disabled={visionExtracting}
+                      className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 disabled:opacity-60"
+                    >
+                      {visionExtracting ? "Reading image..." : "Read event from image"}
+                    </button>
+                    <p className="text-xs text-slate-500">
+                      Image-to-event limit: 3 uses, then a 4-hour cooldown. Recurrence is automatically set to “do-not-repeat”.
+                    </p>
+                    {visionMessage ? (
+                      <p className="text-xs text-emerald-600">{visionMessage}</p>
+                    ) : null}
+                  </div>
                 </Field>
 
                 <ToggleRow
