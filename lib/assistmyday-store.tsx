@@ -140,6 +140,7 @@ type AssistMyDayStore = {
   logout: () => void;
   deleteAccount: () => void;
 
+  setEvents: (events: CalendarEvent[]) => void;
   addEvent: (event: CalendarEvent) => void;
   updateEvent: (event: CalendarEvent) => void;
   deleteEvent: (baseEventId: string) => void;
@@ -629,6 +630,12 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
       deleteHealthRecord: (recordId) => {
         set((state) => ({
           healthRecords: state.healthRecords.filter((item) => item.id !== recordId),
+        }));
+      },
+
+      setEvents: (events) => {
+        set(() => ({
+          events: withFederalHolidays(events || []),
         }));
       },
 
