@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "NestliCalendar/1.0",
+        "User-Agent": "AssistMyDayCalendar/1.0",
       },
       next: { revalidate: 60 * 60 * 24 },
     });

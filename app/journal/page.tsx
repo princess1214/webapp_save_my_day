@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useNestliStore } from "../../lib/nestli-store";
+import { useAssistMyDayStore } from "../../lib/assistmyday-store";
 
 type MomentCategory =
   | "milestone"
@@ -172,7 +172,7 @@ function buildSearchableText(post: JournalPost) {
 }
 
 export default function JournalPage() {
-  const store = useNestliStore() as any;
+  const store = useAssistMyDayStore() as any;
   const {
     familyMembers,
     profile,
@@ -477,7 +477,10 @@ export default function JournalPage() {
           <button
             key={item.id}
             type="button"
-            onClick={() => toggleChecklistItem(post.id, item.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleChecklistItem(post.id, item.id);
+            }}
             className="flex w-full items-start gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
           >
             <span
@@ -680,7 +683,7 @@ export default function JournalPage() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
-                Nestli
+                AssistMyDay
               </p>
               <h1 className="text-lg font-semibold">Journal</h1>
             </div>
@@ -1076,15 +1079,23 @@ export default function JournalPage() {
                 <h2 className="text-base font-semibold">
                   {selectedPost.visibility === "family" ? "Moment detail" : "Note detail"}
                 </h2>
-                <button
-                  onClick={() => {
-                    setSelectedPost(null);
-                    loadPostIntoComposer(selectedPost);
-                  }}
-                  className="rounded-full bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white"
-                >
-                  Edit
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedPost(null)}
+                    className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedPost(null);
+                      loadPostIntoComposer(selectedPost);
+                    }}
+                    className="rounded-full bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white"
+                  >
+                    Edit
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-4">

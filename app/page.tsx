@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useNestliStore } from "../lib/nestli-store";
+import { useAssistMyDayStore } from "../lib/assistmyday-store";
 
 type RoleOption =
   | "Mom"
@@ -75,7 +75,7 @@ function formatBirthdayTitle(name: string) {
 
 export default function WelcomePage() {
   const router = useRouter();
-  const store = useNestliStore() as any;
+  const store = useAssistMyDayStore() as any;
 
   const {
     profile,
@@ -231,6 +231,16 @@ export default function WelcomePage() {
       return;
     }
 
+    const params =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
+    const invitedFamilyAccount = params.get("familyAccount");
+    const generatedAccountNumber = `${Date.now()}${Math.floor(Math.random() * 10_000)
+      .toString()
+      .padStart(4, "0")}`.slice(0, 13);
+    const accountNumber = invitedFamilyAccount || generatedAccountNumber;
+
     updateProfile?.({
       displayName: displayName.trim(),
       firstName: displayName.trim(),
@@ -240,6 +250,20 @@ export default function WelcomePage() {
       passcode: password,
       phone: "",
     });
+    localStorage.setItem("assistmyday_account_number", accountNumber);
+    localStorage.setItem(
+      "assistmyday_account_profile",
+      JSON.stringify({
+        email: email.trim().toLowerCase(),
+        accountCreationLocation:
+          typeof navigator !== "undefined" && "geolocation" in navigator
+            ? "enabled"
+            : null,
+        birthYear: birthday ? Number(birthday.slice(0, 4)) : null,
+        familyRole: resolvedRole,
+        accountNumber,
+      })
+    );
     
     localStorage.setItem(
       "demo_user_email",
@@ -250,8 +274,8 @@ export default function WelcomePage() {
     mailbox.unshift({
       id: `welcome-${Date.now()}`,
       to: email.trim().toLowerCase(),
-      subject: "Welcome to Nestli 💚",
-      body: `Hi ${displayName.trim() || "there"}, welcome to Nestli! We're glad you're here.`,
+      subject: "Welcome to AssistMyDay 💚",
+      body: `Hi ${displayName.trim() || "there"}, welcome to AssistMyDay! We're glad you're here.`,
       createdAt: new Date().toISOString(),
     });
     localStorage.setItem("demo_mailbox", JSON.stringify(mailbox));
@@ -299,7 +323,7 @@ export default function WelcomePage() {
                 : "bg-emerald-50 text-emerald-700"
             )}
           >
-            Nestli
+            AssistMyDay
           </div>
 
           <h1 className="mt-4 text-3xl font-semibold leading-tight">
@@ -325,7 +349,7 @@ export default function WelcomePage() {
               : "border-slate-200 bg-slate-50"
           )}
         >
-          <h2 className="text-base font-semibold">What you can do with Nestli</h2>
+          <h2 className="text-base font-semibold">What you can do with AssistMyDay</h2>
 
           <div className="mt-4 space-y-3 text-sm">
             <div className="flex items-start gap-3">
@@ -598,7 +622,7 @@ export default function WelcomePage() {
             isDarkMode ? "text-slate-500" : "text-slate-400"
           )}
         >
-          Nestli is a private family organization app. We do not sell your
+          AssistMyDay is a private family organization app. We do not sell your
           personal data. You can control optional data sharing in settings and
           delete your account at any time.
         </p>

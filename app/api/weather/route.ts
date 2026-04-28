@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("latitude", lat);
   url.searchParams.set("longitude", lon);
   url.searchParams.set("current", "temperature_2m,precipitation_probability,weather_code");
+  url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min,weather_code");
+  url.searchParams.set("forecast_days", "1");
 
   try {
     const res = await fetch(url.toString(), { next: { revalidate: 1800 } });

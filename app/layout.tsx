@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nestli",
+  title: "AssistMyDay",
   description: "A warm place for your family’s everyday life",
 };
 

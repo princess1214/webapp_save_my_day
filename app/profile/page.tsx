@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useNestliStore } from "../../lib/nestli-store";
+import { useAssistMyDayStore } from "../../lib/assistmyday-store";
 
 type EventCategory = "health" | "school" | "event" | "finance";
 type Screen =
@@ -93,7 +93,7 @@ function normalizeDate(date: string) {
 }
 
 export default function ProfilePage() {
-  const store = useNestliStore() as any;
+  const store = useAssistMyDayStore() as any;
 
   const {
     profile,
@@ -154,6 +154,7 @@ export default function ProfilePage() {
 
   const [inviteLink, setInviteLink] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [accountNumber, setAccountNumber] = useState("");
 
   const [showPinnedEvents, setShowPinnedEvents] = useState(
     appPreferences.showPinnedEvents ?? true
@@ -190,11 +191,17 @@ export default function ProfilePage() {
   const [shareDataWithDeveloper, setShareDataWithDeveloper] = useState(
     appPreferences.shareDataWithDeveloper ?? true
   );
+  const [temperatureUnit, setTemperatureUnit] = useState<"C" | "F">(
+    appPreferences.temperatureUnit ?? "C"
+  );
 
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined") {
+      setAccountNumber(localStorage.getItem("assistmyday_account_number") || "");
+    }
   }, []);
 
   useEffect(() => {
@@ -214,8 +221,9 @@ export default function ProfilePage() {
     if (!mounted) return;
     const origin = window.location.origin;
     const inviter = encodeURIComponent(displayName || "Family Organizer");
-    setInviteLink(`${origin}/?invite=1&inviter=${inviter}`);
-  }, [mounted, displayName]);
+    const familyAccount = encodeURIComponent(accountNumber || localStorage.getItem("assistmyday_account_number") || "");
+    setInviteLink(`${origin}/?invite=1&inviter=${inviter}&familyAccount=${familyAccount}`);
+  }, [mounted, displayName, accountNumber]);
 
   function flashSaved(message = "Saved") {
     setSaveMessage(message);
@@ -461,6 +469,7 @@ export default function ProfilePage() {
         dndStartTime,
         dndEndTime,
         shareDataWithDeveloper,
+        temperatureUnit,
       });
     }
     flashSaved("Preferences updated");
@@ -487,7 +496,7 @@ export default function ProfilePage() {
 
           <div className="min-w-0 flex-1">
             <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
-              Nestli
+              AssistMyDay
             </p>
             <h1 className="text-lg font-semibold">{title}</h1>
           </div>
@@ -527,6 +536,9 @@ export default function ProfilePage() {
                     </div>
                     <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
                       {resolveAccountRole() || "Family"}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Account ID: {accountNumber || "Not assigned"}
                     </div>
                   </div>
                 </div>
@@ -979,6 +991,26 @@ export default function ProfilePage() {
                       )}
                     >
                       {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="mb-3 text-sm font-semibold text-slate-800">Weather unit</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {["C", "F"].map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setTemperatureUnit(item as "C" | "F")}
+                      className={cn(
+                        "rounded-2xl border px-3 py-3 text-sm transition",
+                        temperatureUnit === item
+                          ? "border-emerald-500 bg-emerald-50 font-semibold text-emerald-700"
+                          : "border-slate-200 bg-slate-50 text-slate-600"
+                      )}
+                    >
+                      °{item}
                     </button>
                   ))}
                 </div>

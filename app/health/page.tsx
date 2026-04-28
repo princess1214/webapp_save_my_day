@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
 import Link from "next/link";
-import { useNestliStore } from "../../lib/nestli-store";
+import { useAssistMyDayStore } from "../../lib/assistmyday-store";
 
 // --- 工具函数 ---
 function cn(...classes: Array<string | false | null | undefined>) {
@@ -58,7 +58,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // --- 主页面 ---
 export default function HealthPage() {
   // 从 Store 中获取全局状态和方法 (参考 Journal 页面)
-  const store = useNestliStore() as any;
+  const store = useAssistMyDayStore() as any;
   const { 
     familyMembers, 
     healthRecords = [], // 默认空数组，防止 store 中还未初始化
@@ -192,7 +192,7 @@ export default function HealthPage() {
         {/* 1. Header (Unified with Profile) */}
         <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 px-4 pb-3 pt-4 backdrop-blur flex justify-between items-end">
           <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Nestli</p>
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-400">AssistMyDay</p>
             <h1 className="text-lg font-semibold">Health</h1>
           </div>
           <button 
