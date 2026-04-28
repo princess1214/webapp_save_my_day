@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAssistMyDayStore } from "../../lib/assistmyday-store";
+import {
+  apiCreateEvent,
+  apiDeleteEvent,
+  apiGetEvents,
+  apiUpdateEvent,
+} from "../../lib/api-client";
 
 type EventCategory = "health" | "school" | "event" | "finance";
 type Importance = "low" | "normal" | "high";
@@ -259,10 +265,10 @@ export default function CalendarPage() {
   const {
     familyMembers = [],
     appPreferences,
+    setEvents,
     addEvent,
     updateEvent,
     deleteEvent,
-    deleteEventOccurrence,
     getEventsForDate,
     getUpcomingEvents,
   } = store;
@@ -316,6 +322,8 @@ export default function CalendarPage() {
   const [visionUsageRemaining, setVisionUsageRemaining] = useState(3);
   const [visionFreezeUntil, setVisionFreezeUntil] = useState<string | null>(null);
   const [activeReminder, setActiveReminder] = useState<CalendarEvent | null>(null);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState("");
   const imageExtractionEnabled = false;
 
   const prefs = {
@@ -342,6 +350,35 @@ export default function CalendarPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadEvents() {
+      setEventsLoading(true);
+      setEventsError("");
+      try {
+        const remoteEvents = await apiGetEvents();
+        if (!cancelled) {
+          setEvents?.(remoteEvents);
+        }
+      } catch {
+        if (!cancelled) {
+          setEventsError("Could not sync events. Showing cached data.");
+        }
+      } finally {
+        if (!cancelled) {
+          setEventsLoading(false);
+        }
+      }
+    }
+
+    loadEvents();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setEvents]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -702,7 +739,7 @@ export default function CalendarPage() {
     );
   }
 
-  function handleSaveEvent() {
+  async function handleSaveEvent() {
     if (!newTitle.trim()) return;
     if (!newDate) return;
     if (!newAllDay && !newTime) return;
@@ -739,52 +776,90 @@ export default function CalendarPage() {
       imageDataUrl: newImageDataUrl || uploadPreview,
     };
 
-    if (formMode === "edit") {
-      updateEvent?.(payload);
-    } else {
-      addEvent?.(payload);
-    }
+    setEventsError("");
 
-    setShowCreateSheet(false);
-    resetCreateForm();
+    try {
+      if (formMode === "edit") {
+        const saved = await apiUpdateEvent(baseId, payload);
+        updateEvent?.(saved);
+      } else {
+        const created = await apiCreateEvent(payload);
+        addEvent?.(created);
+      }
+
+      setShowCreateSheet(false);
+      resetCreateForm();
+    } catch {
+      setEventsError("Failed to save event. Please try again.");
+    }
   }
 
-  function handleDeleteEditingEvent() {
+
+  async function handleDeleteEditingEvent() {
     if (!editingEventId) return;
-  
+
     const isRecurring = newRecurrence !== "do-not-repeat";
-  
+
     if (!isRecurring) {
       const ok = window.confirm("Delete this event?");
       if (!ok) return;
-  
-      deleteEvent?.(editingEventId);
-      setShowCreateSheet(false);
-      resetCreateForm();
+
+      try {
+        setEventsError("");
+        await apiDeleteEvent(editingEventId);
+        deleteEvent?.(editingEventId);
+        setShowCreateSheet(false);
+        resetCreateForm();
+      } catch {
+        setEventsError("Failed to delete event. Please try again.");
+      }
       return;
     }
-  
+
     const deleteSeries = window.confirm(
       "This is a recurring event.\n\nPress OK to delete the entire recurring series.\nPress Cancel to choose deleting only this occurrence."
     );
-  
+
     if (deleteSeries) {
-      deleteEvent?.(editingEventId);
-      setShowCreateSheet(false);
-      resetCreateForm();
+      try {
+        setEventsError("");
+        await apiDeleteEvent(editingEventId);
+        deleteEvent?.(editingEventId);
+        setShowCreateSheet(false);
+        resetCreateForm();
+      } catch {
+        setEventsError("Failed to delete event. Please try again.");
+      }
       return;
     }
-  
+
     const deleteOnlyThisOne = window.confirm(
       `Delete only this occurrence on ${editingOccurrenceDate || newDate}?`
     );
-  
+
     if (!deleteOnlyThisOne) return;
-  
-    deleteEventOccurrence?.(editingEventId, editingOccurrenceDate || newDate);
-    setShowCreateSheet(false);
-    resetCreateForm();
+
+    const baseEvent = (store.events || []).find((event: CalendarEvent) => event.id === editingEventId);
+    if (!baseEvent) return;
+
+    const nextEvent: CalendarEvent = {
+      ...baseEvent,
+      excludedDates: Array.from(
+        new Set([...(baseEvent.excludedDates || []), editingOccurrenceDate || newDate])
+      ),
+    };
+
+    try {
+      setEventsError("");
+      const saved = await apiUpdateEvent(editingEventId, nextEvent);
+      updateEvent?.(saved);
+      setShowCreateSheet(false);
+      resetCreateForm();
+    } catch {
+      setEventsError("Failed to update recurring event. Please try again.");
+    }
   }
+
 
   function goPrevMonth() {
     if (viewMode === "month") {
@@ -1153,6 +1228,16 @@ export default function CalendarPage() {
               ⏰ Reminder: {activeReminder.title} ·{" "}
               {formatFriendlyDate(activeReminder.date, prefs.dateFormat)}{" "}
               {activeReminder.allDay ? "All day" : formatDisplayTime(activeReminder.time, prefs.timeFormat)}
+            </div>
+          ) : null}
+          {eventsLoading ? (
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Syncing events...
+            </div>
+          ) : null}
+          {eventsError ? (
+            <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {eventsError}
             </div>
           ) : null}
           {viewMode === "month" ? (
