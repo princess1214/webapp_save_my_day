@@ -36,6 +36,8 @@ export type FamilyMember = {
   birthday?: string;
   color?: string;
   type?: MemberType;
+  userId?: string;
+  familyId?: string;
 };
 
 export type CalendarEvent = {
@@ -319,7 +321,7 @@ const defaultAppPreferences: AppPreferences = {
   doNotDisturbMode: "system",
   dndStartTime: "21:00",
   dndEndTime: "07:00",
-  shareDataWithDeveloper: true,
+  shareDataWithDeveloper: false,
   temperatureUnit: "C",
 };
 
@@ -765,7 +767,27 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
     }),
     {
       name: "assistmyday-store",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        const LEGACY_KEY = "nestli-store";
+        return {
+          getItem: (name: string) => {
+            const current = localStorage.getItem(name);
+            if (current) return current;
+            const legacy = localStorage.getItem(LEGACY_KEY);
+            if (legacy) {
+              localStorage.setItem(name, legacy);
+              return legacy;
+            }
+            return null;
+          },
+          setItem: (name: string, value: string) => {
+            localStorage.setItem(name, value);
+          },
+          removeItem: (name: string) => {
+            localStorage.removeItem(name);
+          },
+        };
+      }),
       migrate: (persistedState: any) => persistedState,
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useAssistMyDayStore } from "../../lib/assistmyday-store";
+import { SELF_MEMBER_ID, useAssistMyDayStore } from "../../lib/assistmyday-store";
 
 type EventCategory = "health" | "school" | "event" | "finance";
 type Screen =
@@ -22,6 +22,8 @@ type FamilyMemberLike = {
   birthday?: string;
   color?: string;
   type?: MemberType;
+  userId?: string;
+  familyId?: string;
 };
 
 type RoleOption = "Mom" | "Dad" | "Grandparent" | "Caregiver" | "Guardian" | "Custom";
@@ -150,11 +152,13 @@ export default function ProfilePage() {
   const [memberBirthday, setMemberBirthday] = useState("");
   const [memberAvatar, setMemberAvatar] = useState("👶");
   const [showDeleteMemberConfirm, setShowDeleteMemberConfirm] = useState(false);
+  const [showDeleteLinkedMemberConfirm, setShowDeleteLinkedMemberConfirm] = useState(false);
   const [pendingDeleteMemberId, setPendingDeleteMemberId] = useState<string | null>(null);
 
   const [inviteLink, setInviteLink] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
-  const [accountNumber, setAccountNumber] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [familyId, setFamilyId] = useState("");
 
   const [showPinnedEvents, setShowPinnedEvents] = useState(
     appPreferences.showPinnedEvents ?? true
@@ -189,7 +193,7 @@ export default function ProfilePage() {
   const [dndStartTime, setDndStartTime] = useState(appPreferences.dndStartTime ?? "21:00");
   const [dndEndTime, setDndEndTime] = useState(appPreferences.dndEndTime ?? "07:00");
   const [shareDataWithDeveloper, setShareDataWithDeveloper] = useState(
-    appPreferences.shareDataWithDeveloper ?? true
+    appPreferences.shareDataWithDeveloper ?? false
   );
   const [temperatureUnit, setTemperatureUnit] = useState<"C" | "F">(
     appPreferences.temperatureUnit ?? "C"
@@ -200,7 +204,16 @@ export default function ProfilePage() {
   useEffect(() => {
     setMounted(true);
     if (typeof window !== "undefined") {
-      setAccountNumber(localStorage.getItem("assistmyday_account_number") || "");
+      setAccountId(
+        localStorage.getItem("assistmyday_account_id") ||
+          localStorage.getItem("assistmyday_account_number") ||
+          ""
+      );
+      setFamilyId(
+        localStorage.getItem("assistmyday_family_id") ||
+          localStorage.getItem("assistmyday_account_number") ||
+          ""
+      );
     }
   }, []);
 
@@ -221,9 +234,14 @@ export default function ProfilePage() {
     if (!mounted) return;
     const origin = window.location.origin;
     const inviter = encodeURIComponent(displayName || "Family Organizer");
-    const familyAccount = encodeURIComponent(accountNumber || localStorage.getItem("assistmyday_account_number") || "");
-    setInviteLink(`${origin}/?invite=1&inviter=${inviter}&familyAccount=${familyAccount}`);
-  }, [mounted, displayName, accountNumber]);
+    const activeFamilyId = encodeURIComponent(
+      familyId ||
+        localStorage.getItem("assistmyday_family_id") ||
+        localStorage.getItem("assistmyday_account_number") ||
+        ""
+    );
+    setInviteLink(`${origin}/?invite=1&inviter=${inviter}&familyId=${activeFamilyId}`);
+  }, [mounted, displayName, familyId]);
 
   function flashSaved(message = "Saved") {
     setSaveMessage(message);
@@ -424,7 +442,33 @@ export default function ProfilePage() {
   }
 
   function requestDeleteMember(memberId: string) {
+    if (memberId === SELF_MEMBER_ID) {
+      setSaveMessage("Primary user cannot be deleted.");
+      return;
+    }
+    const member = actualFamilyMembers.find((item: FamilyMemberLike) => item.id === memberId);
+    const activeFamilyId =
+      familyId ||
+      (typeof window !== "undefined" ? localStorage.getItem("assistmyday_family_id") : "") ||
+      "";
+    const activeAccountId =
+      accountId ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("assistmyday_account_id") ||
+          localStorage.getItem("assistmyday_account_number")
+        : "") ||
+      "";
+    const isLinkedFamilyUser =
+      Boolean(member?.familyId) &&
+      Boolean(member?.userId) &&
+      member?.familyId === activeFamilyId &&
+      member?.userId !== activeAccountId;
+
     setPendingDeleteMemberId(memberId);
+    if (isLinkedFamilyUser) {
+      setShowDeleteLinkedMemberConfirm(true);
+      return;
+    }
     setShowDeleteMemberConfirm(true);
   }
 
@@ -433,6 +477,7 @@ export default function ProfilePage() {
     deleteFamilyMember?.(pendingDeleteMemberId);
     setPendingDeleteMemberId(null);
     setShowDeleteMemberConfirm(false);
+    setShowDeleteLinkedMemberConfirm(false);
     flashSaved("Family member deleted");
   }
 
@@ -538,7 +583,10 @@ export default function ProfilePage() {
                       {resolveAccountRole() || "Family"}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      Account ID: {accountNumber || "Not assigned"}
+                      Account ID: {accountId || "Not assigned"}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Family ID: {familyId || "Not assigned"}
                     </div>
                   </div>
                 </div>
@@ -576,7 +624,9 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="space-y-3">
-                    {actualFamilyMembers.map((member: FamilyMemberLike) => (
+                    {actualFamilyMembers.map((member: FamilyMemberLike) => {
+                      const canDelete = member.id !== SELF_MEMBER_ID;
+                      return (
                       <div key={member.id} className="rounded-2xl bg-slate-50 px-4 py-3">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3">
@@ -609,14 +659,20 @@ export default function ProfilePage() {
                             </button>
                             <button
                               onClick={() => requestDeleteMember(member.id)}
-                              className="rounded-full bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"
+                              disabled={!canDelete}
+                              className={cn(
+                                "rounded-full px-3 py-2 text-sm font-medium",
+                                canDelete
+                                  ? "bg-rose-50 text-rose-700"
+                                  : "bg-slate-100 text-slate-400"
+                              )}
                             >
                               Delete
                             </button>
                           </div>
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
 
                   <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white p-4">
@@ -670,8 +726,8 @@ export default function ProfilePage() {
 
                 <div className="mt-4">
                   <ToggleRow
-                    title="Share app usage data with developer"
-                    subtitle="Turn this off if you do not want your usage data included for product improvement"
+                    title="Allow failure reports to developer"
+                    subtitle="When on, you can send issue/failure reports from the Report issue page"
                     checked={shareDataWithDeveloper}
                     onChange={(value) => {
                       setShareDataWithDeveloper(value);
@@ -1192,6 +1248,21 @@ export default function ProfilePage() {
             confirmText="Delete"
             onCancel={() => {
               setShowDeleteMemberConfirm(false);
+              setShowDeleteLinkedMemberConfirm(false);
+              setPendingDeleteMemberId(null);
+            }}
+            onConfirm={confirmDeleteMember}
+            danger
+          />
+        ) : null}
+
+        {showDeleteLinkedMemberConfirm ? (
+          <ConfirmModal
+            title="Remove invited family member?"
+            description="This person has the same Family ID but a different User ID. Continuing will remove this invited person from your family account."
+            confirmText="Remove from family"
+            onCancel={() => {
+              setShowDeleteLinkedMemberConfirm(false);
               setPendingDeleteMemberId(null);
             }}
             onConfirm={confirmDeleteMember}

@@ -235,11 +235,12 @@ export default function WelcomePage() {
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search)
         : new URLSearchParams();
-    const invitedFamilyAccount = params.get("familyAccount");
-    const generatedAccountNumber = `${Date.now()}${Math.floor(Math.random() * 10_000)
+    const invitedFamilyId = params.get("familyId") || params.get("familyAccount");
+    const generatedAccountId = `${Date.now().toString().slice(-9)}${Math.floor(Math.random() * 10_000)
       .toString()
-      .padStart(4, "0")}`.slice(0, 13);
-    const accountNumber = invitedFamilyAccount || generatedAccountNumber;
+      .padStart(4, "0")}`;
+    const accountId = generatedAccountId;
+    const familyId = invitedFamilyId || accountId;
 
     updateProfile?.({
       displayName: displayName.trim(),
@@ -250,7 +251,9 @@ export default function WelcomePage() {
       passcode: password,
       phone: "",
     });
-    localStorage.setItem("assistmyday_account_number", accountNumber);
+    localStorage.setItem("assistmyday_account_number", accountId);
+    localStorage.setItem("assistmyday_account_id", accountId);
+    localStorage.setItem("assistmyday_family_id", familyId);
     localStorage.setItem(
       "assistmyday_account_profile",
       JSON.stringify({
@@ -261,7 +264,8 @@ export default function WelcomePage() {
             : null,
         birthYear: birthday ? Number(birthday.slice(0, 4)) : null,
         familyRole: resolvedRole,
-        accountNumber,
+        accountId,
+        familyId,
       })
     );
     

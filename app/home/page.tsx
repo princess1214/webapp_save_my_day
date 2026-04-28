@@ -335,9 +335,13 @@ export default function HomePage() {
     const familyParam = encodeURIComponent(
       actualFamilyMembers.map((member: any) => member.name).join(",")
     );
-    const familyAccount = encodeURIComponent(localStorage.getItem("assistmyday_account_number") || "");
+    const familyId = encodeURIComponent(
+      localStorage.getItem("assistmyday_family_id") ||
+        localStorage.getItem("assistmyday_account_number") ||
+        ""
+    );
     setInviteLink(
-      `${window.location.origin}/?invite=1&family=${familyParam}&inviter=${inviterParam}&familyAccount=${familyAccount}`
+      `${window.location.origin}/?invite=1&family=${familyParam}&inviter=${inviterParam}&familyId=${familyId}`
     );
   }, [mounted, actualFamilyMembers, displayName]);
 

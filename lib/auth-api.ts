@@ -7,7 +7,8 @@ export type SessionUser = {
   fullName?: string;
   birthday?: string;
   role?: string;
-  accountNumber?: string;
+  accountId?: string;
+  familyId?: string;
 };
 
 type LoginContext = {
@@ -22,11 +23,11 @@ function delay(ms = 500) {
 }
 
 function generateAccountNumber() {
-  const stamp = Date.now().toString();
+  const stamp = Date.now().toString().slice(-9);
   const rand = Math.floor(Math.random() * 10_000)
     .toString()
     .padStart(4, "0");
-  return `${stamp}${rand}`.slice(0, 13);
+  return `${stamp}${rand}`;
 }
 
 async function fetchLoginContext(): Promise<LoginContext> {
@@ -73,7 +74,7 @@ export async function signup(payload: {
     }
   }
 
-  const accountNumber = generateAccountNumber();
+  const accountId = generateAccountNumber();
   const context = await fetchLoginContext();
 
   const user = {
@@ -82,12 +83,15 @@ export async function signup(payload: {
     birthday: payload.birthday,
     role: payload.role,
     password: payload.password,
-    accountNumber,
+    accountId,
+    familyId: accountId,
     accountCreationLocation: context.location || null,
     birthYear: payload.birthday ? Number(payload.birthday.slice(0, 4)) : null,
     loginHistory: [] as LoginContext[],
   };
-  localStorage.setItem("assistmyday_account_number", accountNumber);
+  localStorage.setItem("assistmyday_account_number", accountId);
+  localStorage.setItem("assistmyday_account_id", accountId);
+  localStorage.setItem("assistmyday_family_id", accountId);
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
   localStorage.setItem(SESSION_KEY, "true");
@@ -97,7 +101,7 @@ export async function signup(payload: {
     id: `welcome-${Date.now()}`,
     to: user.email,
     subject: "Welcome to AssistMyDay",
-    body: `Hi ${user.fullName || "there"},\n\nWelcome to AssistMyDay 💚 We're so happy you are here.\n\nLog in anytime: ${typeof window !== "undefined" ? `${window.location.origin}/login` : "/login"}\n\nYour account number: ${accountNumber}\n\nWarmly,\nAssistMyDay Team`,
+    body: `Hi ${user.fullName || "there"},\n\nWelcome to AssistMyDay 💚 We're so happy you are here.\n\nLog in anytime: ${typeof window !== "undefined" ? `${window.location.origin}/login` : "/login"}\n\nYour account ID: ${accountId}\nFamily ID: ${accountId}\n\nWarmly,\nAssistMyDay Team`,
     createdAt: new Date().toISOString(),
   });
   localStorage.setItem(MAILBOX_KEY, JSON.stringify(mailbox));

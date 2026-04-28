@@ -316,6 +316,7 @@ export default function CalendarPage() {
   const [visionUsageRemaining, setVisionUsageRemaining] = useState(3);
   const [visionFreezeUntil, setVisionFreezeUntil] = useState<string | null>(null);
   const [activeReminder, setActiveReminder] = useState<CalendarEvent | null>(null);
+  const imageExtractionEnabled = false;
 
   const prefs = {
     themeMode: appPreferences?.themeMode ?? "system",
@@ -475,12 +476,18 @@ export default function CalendarPage() {
     const eventId = searchParams.get("eventId");
     const date = searchParams.get("date");
     if (!eventId) return;
-    const target = (store.events || []).find((event: CalendarEvent) => event.id === eventId);
+    const eventDate = date || todayKey;
+    const baseEventId = eventId.includes("_") ? eventId.split("_")[0] : eventId;
+    const dayEvents = (getEventsForDate?.(eventDate, "all", "all", "") || []) as CalendarEvent[];
+    const target =
+      dayEvents.find((event) => event.id === eventId) ||
+      dayEvents.find((event) => event.id === `${baseEventId}_${eventDate}`) ||
+      (store.events || []).find((event: CalendarEvent) => event.id === baseEventId);
     if (target) {
-      if (date) setSelectedDate(date);
+      setSelectedDate(target.date || eventDate);
       openEditEvent(target);
     }
-  }, [searchParams, store.events]);
+  }, [searchParams, store.events, getEventsForDate, todayKey]);
 
   useEffect(() => {
     const reminderKey = "assistmyday_reminder_seen";
@@ -590,7 +597,7 @@ export default function CalendarPage() {
       const result = String(reader.result || "");
       setUploadPreview(result);
       setNewImageDataUrl(result);
-      setVisionMessage("Image ready. Tap “Read event from image”.");
+      setVisionMessage("Image uploaded. Image-to-event extraction is temporarily disabled.");
     };
     reader.readAsDataURL(file);
   }
@@ -1793,15 +1800,17 @@ export default function CalendarPage() {
                         <img src={uploadPreview} alt="Event upload preview" className="h-28 w-full rounded-2xl border border-slate-200 object-cover" />
                       )
                     ) : null}
-                    <button
-                      onClick={handleReadEventFromImage}
-                      disabled={visionExtracting}
-                      className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 disabled:opacity-60"
-                    >
-                      {visionExtracting ? "Reading image..." : "Read event from image"}
-                    </button>
+                    {imageExtractionEnabled ? (
+                      <button
+                        onClick={handleReadEventFromImage}
+                        disabled={visionExtracting}
+                        className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 disabled:opacity-60"
+                      >
+                        {visionExtracting ? "Reading image..." : "Read event from image"}
+                      </button>
+                    ) : null}
                     <p className="text-xs text-slate-500">
-                      Image-to-event limit: 3 uses, then a 4-hour cooldown. Recurrence is automatically set to “do-not-repeat”.
+                      Image-to-event extraction is temporarily unavailable. Upload is still supported and we kept the API code for future re-enable.
                     </p>
                     {visionMessage ? (
                       <p className="text-xs text-emerald-600">{visionMessage}</p>
