@@ -14,11 +14,12 @@ function heuristicExtract(text: string) {
   const addressMatch = compact.match(/\b\d{1,6}\s+[\w\s.-]+(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Lane|Ln|Dr|Drive|Way|Ct|Court)\b/i);
 
   return {
-    title,
+    title: title === "Image event" ? "" : title,
     notes: compact,
     extractedDate: dateMatch?.[1] || "",
     extractedTime: timeMatch?.[1] || "",
     extractedLocation: addressMatch?.[0] || "",
+    isReliable: Boolean(dateMatch?.[1] && timeMatch?.[1] && addressMatch?.[0]),
   };
 }
 
@@ -29,46 +30,65 @@ export async function POST(request: NextRequest) {
   }
 
   const endpoint = process.env.AZURE_VISION_ENDPOINT;
-  const key = process.env.AZURE_VISION_KEY;
+  const key = process.env.OPENAI_API_KEY;
 
-  if (!endpoint || !key) {
+  if (!key) {
     return NextResponse.json({
       provider: "mock",
-      ...heuristicExtract("Uploaded image receipt/event scan"),
+      ...heuristicExtract(""),
     });
   }
 
   try {
-    const analyzeRes = await fetch(`${endpoint}/computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=read`, {
+    const analyzeRes = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Ocp-Apim-Subscription-Key": key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ url: body.imageDataUrl }),
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        input: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_text",
+                text: "Extract US flyer event details. Return compact JSON keys: title, extractedDate(YYYY-MM-DD), extractedTime(HH:mm or empty), extractedLocation, notes, durationMinutes(number), isReliable(boolean). If uncertain, leave fields empty and isReliable false."
+              },
+              {
+                type: "input_image",
+                image_url: body.imageDataUrl
+              }
+            ]
+          }
+        ]
+      }),
     });
 
     if (!analyzeRes.ok) {
-      const fallback = heuristicExtract("Uploaded image receipt/event scan");
+      const fallback = heuristicExtract("");
       return NextResponse.json({ provider: "fallback", ...fallback });
     }
 
     const data = (await analyzeRes.json()) as any;
-    const lines: string[] =
-      data?.readResult?.blocks?.flatMap((block: any) =>
-        block?.lines?.map((line: any) => line?.text).filter(Boolean)
-      ) || [];
-
-    const extractedText = lines.join("\n");
+    const raw = data?.output_text || "";
+    const parsed = JSON.parse(raw || "{}");
 
     return NextResponse.json({
-      provider: "azure-ai-vision",
-      ...heuristicExtract(extractedText),
+      provider: "openai-vision",
+      title: parsed.title || "",
+      notes: parsed.notes || "",
+      extractedDate: parsed.extractedDate || "",
+      extractedTime: parsed.extractedTime || "",
+      extractedLocation: parsed.extractedLocation || "",
+      durationMinutes: Number(parsed.durationMinutes || 0),
+      isReliable: Boolean(parsed.isReliable),
     });
   } catch {
     return NextResponse.json({
       provider: "fallback",
-      ...heuristicExtract("Uploaded image receipt/event scan"),
+      ...heuristicExtract(""),
     });
   }
 }

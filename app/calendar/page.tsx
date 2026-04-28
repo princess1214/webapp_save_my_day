@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useNestliStore } from "../../lib/nestli-store";
+import { useSearchParams } from "next/navigation";
+import { useAssistMyDayStore } from "../../lib/assistmyday-store";
 
 type EventCategory = "health" | "school" | "event" | "finance";
 type Importance = "low" | "normal" | "high";
@@ -17,6 +18,7 @@ type CalendarEvent = {
   id: string;
   title: string;
   date: string;
+  endDate?: string;
   time: string;
   allDay?: boolean;
   durationMinutes?: number;
@@ -31,6 +33,7 @@ type CalendarEvent = {
   recurrenceDays?: string[];
   recurrenceEveryHours?: string;
   reminderMinutes?: string;
+  imageDataUrl?: string;
 };
 
 type VisionExtractResult = {
@@ -40,6 +43,8 @@ type VisionExtractResult = {
   extractedDate?: string;
   extractedTime?: string;
   extractedLocation?: string;
+  durationMinutes?: number;
+  isReliable?: boolean;
 };
 
 type FamilyMember = {
@@ -54,6 +59,13 @@ type FamilyMember = {
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function filterEventsForMemberView(events: CalendarEvent[], selectedMemberId: string) {
+  if (selectedMemberId !== "all") {
+    return events.filter((event) => !event.id.startsWith("us-fed-"));
+  }
+  return events;
 }
 
 function formatDateKey(date: Date) {
@@ -239,10 +251,11 @@ const recurrenceOptions: Recurrence[] = [
 const importanceOptions: Importance[] = ["low", "normal", "high"];
 
 export default function CalendarPage() {
+  const searchParams = useSearchParams();
   const today = new Date();
   const [todayKey] = useState(() => formatDateKey(new Date()));
 
-  const store = useNestliStore() as any;
+  const store = useAssistMyDayStore() as any;
   const {
     familyMembers = [],
     appPreferences,
@@ -275,6 +288,7 @@ export default function CalendarPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newDate, setNewDate] = useState(todayKey);
   const [newTime, setNewTime] = useState("09:00");
+  const [newEndDate, setNewEndDate] = useState("");
   const [newDurationMinutes, setNewDurationMinutes] = useState("60");
   const [newAllDay, setNewAllDay] = useState(false);
   const [newCategory, setNewCategory] = useState<EventCategory>("event");
@@ -289,16 +303,19 @@ export default function CalendarPage() {
   const [newRecurrenceDays, setNewRecurrenceDays] = useState<string[]>([]);
   const [newRecurrenceEveryHours, setNewRecurrenceEveryHours] = useState("");
   const [newReminderMinutes, setNewReminderMinutes] = useState("60");
+  const [newImageDataUrl, setNewImageDataUrl] = useState("");
   
   const [addressQuery, setAddressQuery] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [uploadPreview, setUploadPreview] = useState("");
+  const [uploadMimeType, setUploadMimeType] = useState("");
   const [visionExtracting, setVisionExtracting] = useState(false);
   const [visionMessage, setVisionMessage] = useState("");
   const [visionUsageRemaining, setVisionUsageRemaining] = useState(3);
   const [visionFreezeUntil, setVisionFreezeUntil] = useState<string | null>(null);
+  const [activeReminder, setActiveReminder] = useState<CalendarEvent | null>(null);
 
   const prefs = {
     themeMode: appPreferences?.themeMode ?? "system",
@@ -327,7 +344,7 @@ export default function CalendarPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const raw = localStorage.getItem("nestli_vision_usage");
+    const raw = localStorage.getItem("assistmyday_vision_usage");
     if (!raw) return;
     try {
       const data = JSON.parse(raw) as { count: number; freezeUntil?: string };
@@ -395,12 +412,13 @@ export default function CalendarPage() {
     familyMembers[0];
 
   const selectedDayEvents = useMemo(() => {
-    return (getEventsForDate?.(
+    const events = (getEventsForDate?.(
       selectedDate,
       selectedMemberId,
       selectedCategoryFilter,
       searchTerm
     ) || []) as CalendarEvent[];
+    return filterEventsForMemberView(events, selectedMemberId);
   }, [
     getEventsForDate,
     selectedDate,
@@ -410,8 +428,9 @@ export default function CalendarPage() {
   ]);
 
   const upcomingEvents = useMemo(() => {
-    return (getUpcomingEvents?.(todayKey, selectedMemberId, 8) ||
+    const events = (getUpcomingEvents?.(todayKey, selectedMemberId, 3) ||
       []) as CalendarEvent[];
+    return filterEventsForMemberView(events, selectedMemberId);
   }, [getUpcomingEvents, todayKey, selectedMemberId]);
 
   const eventCountByDate = useMemo(() => {
@@ -419,9 +438,9 @@ export default function CalendarPage() {
 
     monthCells.forEach((cell) => {
       const key = formatDateKey(cell.date);
-      const count = (
+      const count = filterEventsForMemberView((( 
         getEventsForDate?.(key, selectedMemberId, selectedCategoryFilter, searchTerm) || []
-      ).length;
+      ) as CalendarEvent[]), selectedMemberId).length;
       map.set(key, count);
     });
 
@@ -434,11 +453,67 @@ export default function CalendarPage() {
     searchTerm,
   ]);
 
+  const spanningEventByDate = useMemo(() => {
+    const map = new Map<string, boolean>();
+    monthCells.forEach((cell) => {
+      const key = formatDateKey(cell.date);
+      const hasSpan = filterEventsForMemberView(((getEventsForDate?.(key, selectedMemberId, selectedCategoryFilter, searchTerm) || []) as CalendarEvent[]), selectedMemberId).some(
+        (event) => (event.endDate || event.date) > event.date
+      );
+      map.set(key, hasSpan);
+    });
+    return map;
+  }, [monthCells, getEventsForDate, selectedMemberId, selectedCategoryFilter, searchTerm]);
+
   useEffect(() => {
     const d = parseDateKey(selectedDate);
     setCurrentYear(d.getFullYear());
     setCurrentMonth(d.getMonth());
   }, [selectedDate]);
+
+  useEffect(() => {
+    const eventId = searchParams.get("eventId");
+    const date = searchParams.get("date");
+    if (!eventId) return;
+    const target = (store.events || []).find((event: CalendarEvent) => event.id === eventId);
+    if (target) {
+      if (date) setSelectedDate(date);
+      openEditEvent(target);
+    }
+  }, [searchParams, store.events]);
+
+  useEffect(() => {
+    const reminderKey = "assistmyday_reminder_seen";
+    const seenRaw =
+      typeof window !== "undefined" ? localStorage.getItem(reminderKey) : null;
+    const seen: Record<string, number> = seenRaw ? JSON.parse(seenRaw) : {};
+
+    const timer = window.setInterval(() => {
+      const allUpcoming = (getUpcomingEvents?.(todayKey, "all", 30) || []) as CalendarEvent[];
+      const now = Date.now();
+
+      const due = allUpcoming.find((event) => {
+        if (!event.date || !event.time) return false;
+        const minutesBefore = Number(event.reminderMinutes || "0");
+        const triggerTs =
+          new Date(`${event.date}T${event.time || "00:00"}:00`).getTime() -
+          minutesBefore * 60 * 1000;
+        const idKey = `${event.id}-${event.date}`;
+        if (now < triggerTs || now > triggerTs + 5 * 60 * 1000) return false;
+        if (seen[idKey]) return false;
+        seen[idKey] = now;
+        localStorage.setItem(reminderKey, JSON.stringify(seen));
+        return true;
+      });
+
+      if (due) {
+        setActiveReminder(due);
+        window.setTimeout(() => setActiveReminder(null), 5 * 60 * 1000);
+      }
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, [getUpcomingEvents, todayKey]);
 
   function resetCreateForm() {
     setFormMode("create");
@@ -447,6 +522,7 @@ export default function CalendarPage() {
     setNewTitle("");
     setNewDate(selectedDate);
     setNewTime("09:00");
+    setNewEndDate(selectedDate);
     setNewDurationMinutes("60");
     setNewAllDay(false);
     setNewCategory("event");
@@ -462,10 +538,12 @@ export default function CalendarPage() {
     setNewRecurrenceDays([]);
     setNewRecurrenceEveryHours("");
     setNewReminderMinutes("60");
+    setNewImageDataUrl("");
     setAddressQuery("");
     setAddressSuggestions([]);
     setShowAddressSuggestions(false);
     setUploadPreview("");
+    setUploadMimeType("");
     setVisionMessage("");
   }
 
@@ -482,6 +560,7 @@ export default function CalendarPage() {
     setNewTitle(event.title);
     setNewDate(event.date);
     setNewTime(event.time || "09:00");
+    setNewEndDate(event.endDate || event.date);
     setNewDurationMinutes(String(event.durationMinutes || 60));
     setNewAllDay(Boolean(event.allDay));
     setNewCategory(event.category);
@@ -495,18 +574,22 @@ export default function CalendarPage() {
     setNewRecurrenceDays(event.recurrenceDays || []);
     setNewRecurrenceEveryHours(event.recurrenceEveryHours || "");
     setNewReminderMinutes(event.reminderMinutes || "60");
+    setNewImageDataUrl(event.imageDataUrl || "");
     setAddressQuery(event.location || "");
     setShowAddressSuggestions(false);
+    setUploadPreview(event.imageDataUrl || "");
     setShowCreateSheet(true);
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadMimeType(file.type || "");
     const reader = new FileReader();
     reader.onload = () => {
       const result = String(reader.result || "");
       setUploadPreview(result);
+      setNewImageDataUrl(result);
       setVisionMessage("Image ready. Tap “Read event from image”.");
     };
     reader.readAsDataURL(file);
@@ -525,7 +608,7 @@ export default function CalendarPage() {
 
     if (visionUsageRemaining <= 0) {
       const freezeUntil = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
-      localStorage.setItem("nestli_vision_usage", JSON.stringify({ count: 3, freezeUntil }));
+      localStorage.setItem("assistmyday_vision_usage", JSON.stringify({ count: 3, freezeUntil }));
       setVisionFreezeUntil(freezeUntil);
       setVisionMessage(`Usage limit reached. Try again after ${new Date(freezeUntil).toLocaleTimeString()}.`);
       return;
@@ -540,36 +623,57 @@ export default function CalendarPage() {
         body: JSON.stringify({ imageDataUrl: uploadPreview }),
       });
       const data = (await res.json()) as VisionExtractResult;
-
-      if (data.title) setNewTitle(data.title);
-      if (data.notes) setNewNotes(data.notes);
-      if (data.extractedLocation) {
-        setNewLocation(data.extractedLocation);
-        setAddressQuery(data.extractedLocation);
-      }
       const date = normalizeExtractedDate(data.extractedDate || "");
-      if (date) setNewDate(date);
       const time = normalizeExtractedTime(data.extractedTime || "");
-      if (time) setNewTime(time);
+      const hasCoreFields = Boolean(
+        data.title?.trim() &&
+          date &&
+          time &&
+          data.extractedLocation?.trim()
+      );
+
+      if (!data.isReliable || !hasCoreFields) {
+        setNewTitle("");
+        setNewDate("");
+        setNewTime("");
+        setNewEndDate("");
+        setNewDurationMinutes("");
+        setNewLocation("");
+        setAddressQuery("");
+        setVisionMessage("Could not reliably read event details. Please fill in manually.");
+      } else {
+        setNewTitle(data.title?.trim() || "");
+        if (data.notes) setNewNotes(data.notes);
+        setNewLocation(data.extractedLocation?.trim() || "");
+        setAddressQuery(data.extractedLocation?.trim() || "");
+        setNewDate(date);
+        setNewEndDate(date);
+        setNewTime(time);
+        if (data.durationMinutes && data.durationMinutes > 0) {
+          setNewDurationMinutes(String(data.durationMinutes));
+        }
+      }
       setNewRecurrence("do-not-repeat");
 
-      const currentRaw = localStorage.getItem("nestli_vision_usage");
+      const currentRaw = localStorage.getItem("assistmyday_vision_usage");
       const current = currentRaw ? JSON.parse(currentRaw) : { count: 0 };
       const nextCount = (current.count || 0) + 1;
       const nextRemaining = Math.max(0, 3 - nextCount);
       const freezeUntil = nextCount >= 3 ? new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString() : null;
       localStorage.setItem(
-        "nestli_vision_usage",
+        "assistmyday_vision_usage",
         JSON.stringify({ count: nextCount >= 3 ? 3 : nextCount, freezeUntil })
       );
       setVisionUsageRemaining(nextRemaining);
       setVisionFreezeUntil(freezeUntil);
 
-      setVisionMessage(
-        nextRemaining > 0
-          ? `Event details extracted. ${nextRemaining} image read(s) left this cycle.`
-          : "Event details extracted. Limit reached, 4-hour freeze has started."
-      );
+      if (data.isReliable && hasCoreFields) {
+        setVisionMessage(
+          nextRemaining > 0
+            ? `Event details extracted. ${nextRemaining} image read(s) left this cycle.`
+            : "Event details extracted. Limit reached, 4-hour freeze has started."
+        );
+      }
     } catch {
       setVisionMessage("We couldn't read this image. Please try another image.");
     } finally {
@@ -595,6 +699,7 @@ export default function CalendarPage() {
     if (!newTitle.trim()) return;
     if (!newDate) return;
     if (!newAllDay && !newTime) return;
+    const effectiveEndDate = (newEndDate || newDate) < newDate ? newDate : (newEndDate || newDate);
 
     const baseId =
       formMode === "edit" && editingEventId
@@ -605,6 +710,7 @@ export default function CalendarPage() {
       id: baseId,
       title: newTitle.trim(),
       date: newDate,
+      endDate: effectiveEndDate,
       time: newAllDay ? "00:00" : newTime,
       durationMinutes: newAllDay ? 1440 : Number(newDurationMinutes) || 60,
       allDay: newAllDay,
@@ -623,6 +729,7 @@ export default function CalendarPage() {
       recurrenceEveryHours:
         newRecurrence === "custom" ? newRecurrenceEveryHours : "",
       reminderMinutes: newReminderMinutes,
+      imageDataUrl: newImageDataUrl || uploadPreview,
     };
 
     if (formMode === "edit") {
@@ -824,6 +931,12 @@ export default function CalendarPage() {
                 {event.notes}
               </p>
             ) : null}
+
+            {event.imageDataUrl ? (
+              <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                <img src={event.imageDataUrl} alt="Event attachment" className="h-20 w-full object-cover" />
+              </div>
+            ) : null}
           </button>
         </div>
       </div>
@@ -866,7 +979,7 @@ export default function CalendarPage() {
                   isDarkMode ? "text-slate-500" : "text-slate-400"
                 )}
               >
-                Nestli
+                AssistMyDay
               </p>
               <h1 className="text-lg font-semibold">Calendar</h1>
             </div>
@@ -1028,6 +1141,13 @@ export default function CalendarPage() {
         </header>
 
         <div className="flex-1 px-4 pb-24 pt-4">
+          {activeReminder ? (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              ⏰ Reminder: {activeReminder.title} ·{" "}
+              {formatFriendlyDate(activeReminder.date, prefs.dateFormat)}{" "}
+              {activeReminder.allDay ? "All day" : formatDisplayTime(activeReminder.time, prefs.timeFormat)}
+            </div>
+          ) : null}
           {viewMode === "month" ? (
             <section className="mb-6">
               <div className="mb-2 grid grid-cols-7 gap-2">
@@ -1050,6 +1170,7 @@ export default function CalendarPage() {
                   const isSelected = key === selectedDate;
                   const isToday = key === todayKey;
                   const count = eventCountByDate.get(key) ?? 0;
+                  const hasSpan = spanningEventByDate.get(key);
 
                   return (
                     <button
@@ -1108,6 +1229,9 @@ export default function CalendarPage() {
                           </span>
                         )}
                       </div>
+                      {hasSpan ? (
+                        <div className="mt-1 h-1 w-full rounded-full bg-emerald-400/70" />
+                      ) : null}
                     </button>
                   );
                 })}
@@ -1120,14 +1244,14 @@ export default function CalendarPage() {
                   const key = formatDateKey(date);
                   const isSelected = key === selectedDate;
                   const isToday = key === todayKey;
-                  const count = (
+                  const count = filterEventsForMemberView(((
                     getEventsForDate?.(
                       key,
                       selectedMemberId,
                       selectedCategoryFilter,
                       searchTerm
                     ) || []
-                  ).length;
+                  ) as CalendarEvent[]), selectedMemberId).length;
 
                   return (
                     <button
@@ -1258,7 +1382,7 @@ export default function CalendarPage() {
                   isDarkMode ? "text-slate-500" : "text-slate-400"
                 )}
               >
-                Agenda
+                Upcoming events
               </div>
               <button
                 onClick={() => {
@@ -1272,7 +1396,7 @@ export default function CalendarPage() {
             </div>
 
             <div className="space-y-3">
-              {upcomingEvents.length > 0 ? (
+                {upcomingEvents.length > 0 ? (
                 upcomingEvents.map((event: CalendarEvent) => renderEventRow(event))
               ) : (
                 <div
@@ -1425,6 +1549,20 @@ export default function CalendarPage() {
                   onChange={setNewAllDay}
                   darkMode={isDarkMode}
                 />
+
+                <Field label="End date (optional)" darkMode={isDarkMode}>
+                  <input
+                    type="date"
+                    value={newEndDate}
+                    onChange={(e) => setNewEndDate(e.target.value)}
+                    min={newDate || undefined}
+                    className={cn(
+                      inputClass,
+                      isDarkMode &&
+                        "border-slate-800 bg-slate-900 text-slate-100 focus:bg-slate-900"
+                    )}
+                  />
+                </Field>
 
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Duration (min)" darkMode={isDarkMode}>
@@ -1645,9 +1783,15 @@ export default function CalendarPage() {
 
                 <Field label="Event image (optional)" darkMode={isDarkMode}>
                   <div className="space-y-3">
-                    <input type="file" accept="image/*" onChange={handleImageUpload} />
+                    <input type="file" accept="image/*,application/pdf" onChange={handleImageUpload} />
                     {uploadPreview ? (
-                      <img src={uploadPreview} alt="Event upload preview" className="h-28 w-full rounded-2xl border border-slate-200 object-cover" />
+                      uploadMimeType === "application/pdf" ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                          PDF attached and ready for extraction.
+                        </div>
+                      ) : (
+                        <img src={uploadPreview} alt="Event upload preview" className="h-28 w-full rounded-2xl border border-slate-200 object-cover" />
+                      )
                     ) : null}
                     <button
                       onClick={handleReadEventFromImage}

@@ -1,19 +1,32 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useAssistMyDayStore } from '../../lib/assistmyday-store';
 
-const SUPPORT_EMAIL = 'developer@example.com';
+const SUPPORT_EMAIL = 'emily.huahua.z@gmail.com';
+const REPORT_SUBJECT = 'ASSISTMYDAY APP ISSUE - USER REPORT';
 
 export default function ReportIssuePage() {
+  const store = useAssistMyDayStore() as any;
+  const profile = store.profile || {};
   const [issue, setIssue] = useState('');
   const [deviceInfo, setDeviceInfo] = useState('');
+  const [accountNumber, setAccountNumber] = useState('Unknown');
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAccountNumber(localStorage.getItem("assistmyday_account_number") || "Unknown");
+    }
+  }, []);
 
   const mailto = useMemo(() => {
-    const subject = encodeURIComponent('Nestli app issue report');
-    const body = encodeURIComponent(`Issue details:\n${issue || '(Please describe the problem)'}\n\nDevice/Browser:\n${deviceInfo || '(Optional)'}\n`);
+    const subject = encodeURIComponent(REPORT_SUBJECT);
+    const body = encodeURIComponent(
+      `Issue details:\n${issue || '(Please describe the problem)'}\n\nDevice/Browser:\n${deviceInfo || '(Optional)'}\n\nAccount ID: ${accountNumber}\nRegistered email: ${profile?.email || 'Unknown'}\n`
+    );
     return `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
-  }, [issue, deviceInfo]);
+  }, [issue, deviceInfo, profile?.email]);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -46,7 +59,6 @@ export default function ReportIssuePage() {
           Send to developer
         </a>
 
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Current destination: {SUPPORT_EMAIL}</p>
         <Link href="/profile" className="mt-6 inline-block text-sm font-medium text-emerald-600 underline">
           Back to Profile
         </Link>

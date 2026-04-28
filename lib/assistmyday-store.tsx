@@ -42,6 +42,7 @@ export type CalendarEvent = {
   id: string;
   title: string;
   date: string;
+  endDate?: string;
   time: string;
   allDay?: boolean;
   durationMinutes?: number;
@@ -57,6 +58,7 @@ export type CalendarEvent = {
   recurrenceEveryHours?: string;
   reminderMinutes?: string;
   excludedDates?: string[];
+  imageDataUrl?: string;
 };
 
 export type JournalPost = {
@@ -103,9 +105,10 @@ export type AppPreferences = {
   dndStartTime: string;
   dndEndTime: string;
   shareDataWithDeveloper: boolean;
+  temperatureUnit: "C" | "F";
 };
 
-type NestliStore = {
+type AssistMyDayStore = {
   isAuthenticated: boolean;
 
   profile: Profile;
@@ -272,9 +275,10 @@ function buildUSFederalHolidayEvents(year: number): CalendarEvent[] {
       memberIds: [ALL_MEMBER_ID],
       notes: "US federal holiday.",
       pinned: false,
-      importance: "normal" as const,
+      importance: "low" as const,
       recurrence: "do-not-repeat" as const,
       reminderMinutes: "1440",
+      endDate: `${y}-${m}-${d}`,
     };
   });
 }
@@ -316,6 +320,7 @@ const defaultAppPreferences: AppPreferences = {
   dndStartTime: "21:00",
   dndEndTime: "07:00",
   shareDataWithDeveloper: true,
+  temperatureUnit: "C",
 };
 
 function formatDateKey(date: Date) {
@@ -371,6 +376,7 @@ function matchesSearch(event: CalendarEvent, searchTerm?: string) {
 function recurrenceIncludesDate(event: CalendarEvent, targetDate: string) {
   const baseDate = parseDate(event.date);
   const currentDate = parseDate(targetDate);
+  const eventEndDate = parseDate(event.endDate || event.date);
 
   if (currentDate.getTime() < baseDate.getTime()) return false;
   if (event.excludedDates?.includes(targetDate)) return false;
@@ -384,7 +390,10 @@ function recurrenceIncludesDate(event: CalendarEvent, targetDate: string) {
 
   switch (event.recurrence) {
     case "do-not-repeat":
-      return targetDate === event.date;
+      return (
+        currentDate.getTime() >= baseDate.getTime() &&
+        currentDate.getTime() <= eventEndDate.getTime()
+      );
 
     case "weekly":
       return currentDate.getDay() === baseDate.getDay();
@@ -454,7 +463,7 @@ function buildInitialState() {
   };
 }
 
-export const useNestliStore = create<NestliStore>()(
+export const useAssistMyDayStore = create<AssistMyDayStore>()(
   persist(
     (set, get) => ({
       ...buildInitialState(),
@@ -755,8 +764,9 @@ export const useNestliStore = create<NestliStore>()(
       },
     }),
     {
-      name: "nestli-store",
+      name: "assistmyday-store",
       storage: createJSONStorage(() => localStorage),
+      migrate: (persistedState: any) => persistedState,
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         profile: state.profile,
@@ -767,8 +777,8 @@ export const useNestliStore = create<NestliStore>()(
         appPreferences: state.appPreferences,
       }),
       merge: (persistedState, currentState) => {
-        const typedPersisted = (persistedState || {}) as Partial<NestliStore>;
-        const typedCurrent = currentState as NestliStore;
+        const typedPersisted = (persistedState || {}) as Partial<AssistMyDayStore>;
+        const typedCurrent = currentState as AssistMyDayStore;
 
         const mergedProfile = {
           ...typedCurrent.profile,

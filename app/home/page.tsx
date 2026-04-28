@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ALL_MEMBER_ID,
   SELF_MEMBER_ID,
-  useNestliStore,
-} from "../../lib/nestli-store";
+  useAssistMyDayStore,
+} from "../../lib/assistmyday-store";
 
 type EventCategory = "health" | "school" | "event" | "finance";
 
@@ -181,7 +181,7 @@ export default function HomePage() {
     setTodayKey(new Date().toISOString().slice(0, 10));
   }, []);
 
-  const store = useNestliStore() as any;
+  const store = useAssistMyDayStore() as any;
   const {
     profile,
     familyMembers = [],
@@ -193,7 +193,7 @@ export default function HomePage() {
   } = store;
 
   const [selectedMemberId, setSelectedMemberId] = useState(ALL_MEMBER_ID);
-  const displayName = profile?.displayName || "Sarah";
+  const displayName = profile?.displayName?.trim() || "New User";
 
   const [dateLabel, setDateLabel] = useState("");
   const [greeting, setGreeting] = useState("Good morning");
@@ -215,6 +215,7 @@ export default function HomePage() {
     timeFormat: appPreferences?.timeFormat ?? "12h",
     dateFormat: appPreferences?.dateFormat ?? "MM/DD/YYYY",
     themeMode: appPreferences?.themeMode ?? "system",
+    temperatureUnit: appPreferences?.temperatureUnit ?? "C",
   };
 
   useEffect(() => {
@@ -287,14 +288,26 @@ export default function HomePage() {
           }
           const data = await res.json();
           const current = data?.current;
-          if (!current) {
+          const daily = data?.daily;
+          if (!current || !daily) {
             setWeatherSummary("Weather unavailable right now.");
             return;
           }
-          const temp = Math.round(current.temperature_2m);
-          const rainChance = Number(current.precipitation_probability || 0);
-          const outlook = rainChance >= 50 ? "Rain likely" : "Mostly sunny";
-          setWeatherSummary(`${temp}°C · ${outlook} · Rain chance ${rainChance}%`);
+          const maxC = Number(daily.temperature_2m_max?.[0] ?? current.temperature_2m);
+          const minC = Number(daily.temperature_2m_min?.[0] ?? current.temperature_2m);
+          const toUnit = (value: number) =>
+            prefs.temperatureUnit === "F"
+              ? Math.round((value * 9) / 5 + 32)
+              : Math.round(value);
+          const icon =
+            Number(current.precipitation_probability || 0) >= 50
+              ? "🌧️"
+              : Number(current.weather_code) >= 3
+              ? "☁️"
+              : "☀️";
+          setWeatherSummary(
+            `Your location · ${toUnit(minC)}°-${toUnit(maxC)}°${prefs.temperatureUnit} ${icon}`
+          );
         } catch {
           setWeatherSummary("Weather unavailable right now.");
         }
@@ -302,7 +315,7 @@ export default function HomePage() {
       () => setWeatherSummary("Weather unavailable: location permission denied."),
       { timeout: 8000 }
     );
-  }, []);
+  }, [prefs.temperatureUnit]);
 
   const isDarkMode =
     prefs.themeMode === "dark" ||
@@ -322,8 +335,9 @@ export default function HomePage() {
     const familyParam = encodeURIComponent(
       actualFamilyMembers.map((member: any) => member.name).join(",")
     );
+    const familyAccount = encodeURIComponent(localStorage.getItem("assistmyday_account_number") || "");
     setInviteLink(
-      `${window.location.origin}/?invite=1&family=${familyParam}&inviter=${inviterParam}`
+      `${window.location.origin}/?invite=1&family=${familyParam}&inviter=${inviterParam}&familyAccount=${familyAccount}`
     );
   }, [mounted, actualFamilyMembers, displayName]);
 
@@ -337,9 +351,10 @@ export default function HomePage() {
   }, [getPinnedEvents, todayKey, selectedMemberId, prefs.showPinnedEvents]);
 
   const upcomingEvents = useMemo(() => {
-    return (
+    const events = (
       (getUpcomingEvents?.(todayKey, selectedMemberId, prefs.displayEventsCount) || []) as CalendarEvent[]
     );
+    return events.filter((event) => event.importance !== "low");
   }, [getUpcomingEvents, todayKey, selectedMemberId, prefs.displayEventsCount]);
 
   const topMoments = useMemo(() => {
@@ -486,6 +501,19 @@ export default function HomePage() {
           <section className="mb-6">
             <div
               className={cn(
+                "mb-3 rounded-2xl border px-4 py-3 text-sm font-medium",
+                isDarkMode
+                  ? "border-violet-500/20 bg-violet-500/10 text-violet-200"
+                  : "border-violet-100 bg-violet-50 text-violet-700"
+              )}
+            >
+              💜 {dailyCheerMessage}
+            </div>
+          </section>
+
+          <section className="mb-6">
+            <div
+              className={cn(
                 "mb-3 text-[11px] font-semibold uppercase tracking-[0.14em]",
                 isDarkMode ? "text-slate-500" : "text-slate-400"
               )}
@@ -566,16 +594,6 @@ export default function HomePage() {
           </section>
 
           <section className="mb-6">
-            <div
-              className={cn(
-                "mb-3 rounded-2xl border px-4 py-3 text-sm font-medium",
-                isDarkMode
-                  ? "border-violet-500/20 bg-violet-500/10 text-violet-200"
-                  : "border-violet-100 bg-violet-50 text-violet-700"
-              )}
-            >
-              💜 {dailyCheerMessage}
-            </div>
             <div
               onClick={() => setShowQuickLogSheet(true)}
               className={cn(
@@ -724,7 +742,7 @@ export default function HomePage() {
                   return (
                     <Link
                       key={event.id}
-                      href="/calendar"
+                      href={`/calendar?eventId=${encodeURIComponent(event.id)}&date=${encodeURIComponent(event.date)}`}
                       className={cn(
                         "flex items-center gap-3 rounded-2xl border px-4 py-3",
                         isDarkMode
@@ -762,14 +780,6 @@ export default function HomePage() {
                                 prefs.timeFormat
                               )}`}
                         </div>
-                        <span
-                          className={cn(
-                            "rounded-full px-3 py-1 text-xs font-semibold",
-                            styles.badge
-                          )}
-                        >
-                          {event.date === todayKey ? "Today" : "Due"}
-                        </span>
                       </div>
                     </Link>
                   );

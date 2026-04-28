@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useNestliStore } from '@/lib/nestli-store';
+import { useAssistMyDayStore } from '@/lib/assistmyday-store';
 
 export function ThemeSync() {
-  const themeMode = useNestliStore((s: any) => s.appPreferences?.themeMode ?? 'system');
+  const themeMode = useAssistMyDayStore((s: any) => s.appPreferences?.themeMode ?? 'system');
 
   useEffect(() => {
     const root = document.documentElement;
