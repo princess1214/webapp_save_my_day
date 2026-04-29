@@ -67,117 +67,30 @@ export async function signup(payload: {
   birthday?: string;
   role?: string;
 }) {
-  await delay();
-
-  const existing = localStorage.getItem(STORAGE_KEY);
-  if (existing) {
-    const user = JSON.parse(existing);
-    if (user.email === payload.email.toLowerCase()) {
-      throw new Error("This email is already registered. Please log in.");
-    }
-  }
-
-  const accountId = generateAccountNumber();
-  const context = await fetchLoginContext();
-
-  const user = {
-    email: payload.email.toLowerCase(),
-    fullName: payload.fullName,
-    birthday: payload.birthday,
-    role: payload.role,
-    password: payload.password,
-    accountId,
-    familyId: generateFamilyId(),
-    accountCreationLocation: context.location || null,
-    birthYear: payload.birthday ? Number(payload.birthday.slice(0, 4)) : null,
-    loginHistory: [] as LoginContext[],
-  };
-  localStorage.setItem("assistmyday_account_number", accountId);
-  localStorage.setItem("assistmyday_account_id", accountId);
-  localStorage.setItem("assistmyday_family_id", user.familyId || generateFamilyId());
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-  localStorage.setItem(SESSION_KEY, "true");
-  const mailboxRaw = localStorage.getItem(MAILBOX_KEY);
-  const mailbox = mailboxRaw ? JSON.parse(mailboxRaw) : [];
-  mailbox.unshift({
-    id: `welcome-${Date.now()}`,
-    to: user.email,
-    subject: "Welcome to AssistMyDay",
-    body: `Hi ${user.fullName || "there"},\n\nWelcome to AssistMyDay 💚 We're so happy you are here.\n\nLog in anytime: ${typeof window !== "undefined" ? `${window.location.origin}/login` : "/login"}\n\nYour account ID: ${accountId}\nFamily ID: ${accountId}\n\nWarmly,\nAssistMyDay Team`,
-    createdAt: new Date().toISOString(),
-  });
-  localStorage.setItem(MAILBOX_KEY, JSON.stringify(mailbox));
-
-  return { success: true, user, welcomeEmailQueued: true };
+  const res = await fetch("/api/auth/signup", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || "Signup failed");
+  return data;
 }
 
 export async function login(payload: { email: string; password: string }) {
-  await delay();
-
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) throw new Error("Account not found");
-
-  const user = JSON.parse(raw);
-
-  if (
-    user.email !== payload.email.toLowerCase() ||
-    user.password !== payload.password
-  ) {
-    throw new Error("Invalid email or passcode");
-  }
-
-  const context = await fetchLoginContext();
-  const loginHistory = (user.loginHistory || []) as LoginContext[];
-  const previous = loginHistory[0];
-
-  if (
-    previous &&
-    (previous.userAgent !== context.userAgent || previous.location !== context.location)
-  ) {
-    const mailboxRaw = localStorage.getItem(MAILBOX_KEY);
-    const mailbox = mailboxRaw ? JSON.parse(mailboxRaw) : [];
-    mailbox.unshift({
-      id: `security-${Date.now()}`,
-      to: user.email,
-      subject: "AssistMyDay security alert: New login detected",
-      body: `We noticed a login from a new device/location.\n\nPrevious: ${previous.userAgent} @ ${previous.location}\nCurrent: ${context.userAgent} @ ${context.location}\n\nIf this wasn't you, please change your password now.`,
-      createdAt: new Date().toISOString(),
-    });
-    localStorage.setItem(MAILBOX_KEY, JSON.stringify(mailbox));
-  }
-
-  const updatedUser = {
-    ...user,
-    loginHistory: [context, ...loginHistory].slice(0, 12),
-  };
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
-  localStorage.setItem(SESSION_KEY, "true");
-
-  return { success: true, user: updatedUser };
+  const res = await fetch("/api/auth/login", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || "Login failed");
+  return data;
 }
 
 export async function logout() {
-  await delay();
-  localStorage.removeItem(SESSION_KEY);
+  const res = await fetch("/api/auth/logout", { method: "POST" });
+  if (!res.ok) throw new Error("Logout failed");
   return { success: true };
 }
 
 export async function getSession() {
-  await delay();
-
-  const session = localStorage.getItem(SESSION_KEY);
-  const raw = localStorage.getItem(STORAGE_KEY);
-
-  if (!session || !raw) {
-    throw new Error("Not logged in");
-  }
-
-  return {
-    authenticated: true,
-    user: JSON.parse(raw),
-  };
+  const res = await fetch("/api/auth/session", { cache: "no-store" });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || "Not logged in");
+  return data;
 }
 
 export async function requestPasswordReset({ email }: { email: string }) {
