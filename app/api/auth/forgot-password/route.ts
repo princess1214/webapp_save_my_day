@@ -1,27 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
+import { NextResponse } from "next/server";
+import { query } from "@/lib/db";
+import { ensureSchema } from "@/lib/schema";
 
-export async function POST(request: NextRequest) {
-  let email = "";
-
-  try {
-    const body = (await request.json()) as { email?: string };
-    email = (body?.email || "").trim().toLowerCase();
-  } catch {
-    return NextResponse.json(
-      { message: "Invalid request payload." },
-      { status: 400 }
-    );
-  }
-
-  if (!email || !email.includes("@")) {
-    return NextResponse.json(
-      { message: "A valid email is required." },
-      { status: 400 }
-    );
-  }
-
-  return NextResponse.json({
-    success: true,
-    message: "If the email exists, a reset link has been sent.",
-  });
+export async function POST(req: Request) {
+  await ensureSchema();
+  const { email } = await req.json();
+  const u = await query<{ id: string }>("SELECT id FROM users WHERE email=$1", [String(email || "").toLowerCase()]);
+  if (!u.rows[0]) return NextResponse.json({ success: true });
+  const token = crypto.randomBytes(24).toString("hex");
+  const expires = new Date(Date.now() + 1000 * 60 * 30);
+  await query("INSERT INTO password_reset_tokens(token,user_id,expires_at) VALUES($1,$2,$3)", [token, u.rows[0].id, expires]);
+  return NextResponse.json({ success: true, token });
 }
