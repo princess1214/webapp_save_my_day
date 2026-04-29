@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAssistMyDayStore } from "../../lib/assistmyday-store";
 import {
@@ -256,7 +256,7 @@ const recurrenceOptions: Recurrence[] = [
 
 const importanceOptions: Importance[] = ["low", "normal", "high"];
 
-export default function CalendarPage() {
+function CalendarPageContent() {
   const searchParams = useSearchParams();
   const today = new Date();
   const [todayKey] = useState(() => formatDateKey(new Date()));
@@ -2027,6 +2027,15 @@ function BottomTabBar({
       <TabItem href="/journal" label="📷" text="Journal" active={active === "journal"} />
       <TabItem href="/profile" label="👤" text="Profile" active={active === "profile"} />
     </nav>
+  );
+}
+
+
+export default function CalendarPage() {
+  return (
+    <Suspense fallback={null}>
+      <CalendarPageContent />
+    </Suspense>
   );
 }
 
