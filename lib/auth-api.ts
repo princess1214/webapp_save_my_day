@@ -23,11 +23,14 @@ function delay(ms = 500) {
 }
 
 function generateAccountNumber() {
-  const stamp = Date.now().toString().slice(-9);
-  const rand = Math.floor(Math.random() * 10_000)
+  return `${Math.floor(Math.random() * 10_000_000_000_000)
     .toString()
-    .padStart(4, "0");
-  return `${stamp}${rand}`;
+    .padStart(13, "0")
+    .slice(0, 13)}`;
+}
+
+function generateFamilyId() {
+  return Math.random().toString(36).slice(2, 8).padEnd(6, "0");
 }
 
 async function fetchLoginContext(): Promise<LoginContext> {
@@ -84,14 +87,14 @@ export async function signup(payload: {
     role: payload.role,
     password: payload.password,
     accountId,
-    familyId: accountId,
+    familyId: generateFamilyId(),
     accountCreationLocation: context.location || null,
     birthYear: payload.birthday ? Number(payload.birthday.slice(0, 4)) : null,
     loginHistory: [] as LoginContext[],
   };
   localStorage.setItem("assistmyday_account_number", accountId);
   localStorage.setItem("assistmyday_account_id", accountId);
-  localStorage.setItem("assistmyday_family_id", accountId);
+  localStorage.setItem("assistmyday_family_id", user.familyId || generateFamilyId());
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
   localStorage.setItem(SESSION_KEY, "true");
