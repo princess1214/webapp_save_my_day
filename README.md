@@ -1,42 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AssistMyDay
 
-## Getting Started
+## Environment variables
+Copy `.env.example` to `.env.local` and set:
+- `DATABASE_URL`
+- `AUTH_SECRET`
+- `APP_BASE_URL`
+- `EMAIL_PROVIDER_API_KEY`
+- `EMAIL_FROM`
+- `NEXT_PUBLIC_API_BASE_URL`
 
-First, run the development server:
+## Local development
+1. `pnpm install`
+2. Create a PostgreSQL database and set `DATABASE_URL`.
+3. Start app: `pnpm dev`
+4. First API/auth request auto-runs schema creation in `lib/server-db.ts`.
 
-```bash
-pnpm dev
-```
+## Database schema / migrations
+Current schema is initialized in `initDb()` (users, sessions, password_reset_tokens, family_members, events, journal_posts, health_records, preferences, issue_reports, login_history). For production, run startup once after deploy to ensure all tables exist.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Vercel deployment
+1. Add all env vars from `.env.example` in Vercel project settings.
+2. Use Vercel Postgres (or any Postgres) and set `DATABASE_URL`.
+3. Deploy.
+4. Hit `/api/auth/session` once to trigger table initialization.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-
-## Environment Variables
-- DATABASE_URL
-- DATABASE_AUTH_TOKEN (optional)
-- AUTH_SECRET
-- APP_BASE_URL
-- EMAIL_PROVIDER_API_KEY
-- EMAIL_FROM
-
-## Account deletion policy
-Deleting an account removes private records owned by that account and removes user from family members. Family-shared records from other accounts remain.
+## Manual test checklist
+- Sign up user and verify login.
+- Create/update/delete event, journal, health record, family member, and preferences.
+- Clear localStorage and login again; verify data loads from backend.
+- Trigger forgot password and verify reset link email and password update.
+- Create invited signup with `inviteFamilyId`; verify different `accountId`, shared `familyId`.

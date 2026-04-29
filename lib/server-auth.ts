@@ -12,11 +12,13 @@ export function makeAccountId() {
 export function makeFamilyId() {
   return Math.random().toString(36).slice(2, 8).toLowerCase();
 }
-export function hashPassword(password: string) {
-  return crypto.scryptSync(password, process.env.AUTH_SECRET || "dev-secret", 64).toString("hex");
+export function hashPassword(password: string, salt?: string) {
+  const passwordSalt = salt || crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, passwordSalt, 64).toString("hex");
+  return { salt: passwordSalt, hash };
 }
-export function verifyPassword(password: string, hash: string) {
-  return hashPassword(password) === hash;
+export function verifyPassword(password: string, hash: string, salt: string) {
+  return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(crypto.scryptSync(password, salt, 64).toString("hex"), "hex"));
 }
 export function hashToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
