@@ -23,6 +23,9 @@ importers:
       next:
         specifier: 15.2.8
         version: 15.2.8(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      pg:
+        specifier: ^8.16.3
+        version: 8.16.3
       react:
         specifier: ^19.0.0
         version: 19.2.5
@@ -4216,3 +4219,8 @@ snapshots:
       immer: 11.1.4
       react: 19.2.5
       use-sync-external-store: 1.6.0(react@19.2.5)
+
+  pg@8.16.3:
+    resolution: {integrity: sha512-unknown}
+    engines: {node: '>= 8.0.0'}
+
