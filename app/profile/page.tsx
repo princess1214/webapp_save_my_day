@@ -590,6 +590,8 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
+                <p className="text-sm text-slate-600">you can send issue/failure reports to the developer</p>
+                <Link href="/report-issue" className="inline-block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">Report an issue</Link>
               </section>
 
               <section className="space-y-3">
@@ -724,7 +726,7 @@ export default function ProfilePage() {
                   support app features and future app development.
                 </p>
 
-                <div className="mt-4">
+                <div className="mt-4 space-y-3">
                   <ToggleRow
                     title="Allow failure reports to developer"
                     subtitle="When on, you can send issue/failure reports from the Report issue page"
@@ -737,6 +739,8 @@ export default function ProfilePage() {
                       flashSaved("Privacy choice updated");
                     }}
                   />
+                  <Link href="/report-issue" className="inline-block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">Report an issue</Link>
+                  <p className="text-sm text-slate-600">you can send issue/failure reports to the developer</p>
                 </div>
               </section>
 
@@ -753,12 +757,6 @@ export default function ProfilePage() {
                   className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
                 >
                   Privacy Policy
-                </Link>
-                <Link
-                  href="/report-issue"
-                  className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
-                >
-                  Report an issue
                 </Link>
               </section>
             </div>

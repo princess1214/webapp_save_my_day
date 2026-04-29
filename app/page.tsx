@@ -287,7 +287,7 @@ export default function WelcomePage() {
     upsertBirthdayEvent();
     setSuccessMessage("Family account created. A welcome email was sent to your mailbox.");
     window.setTimeout(() => {
-      router.push("/home");
+      router.push("/profile");
     }, 500);
   }
 
@@ -308,7 +308,7 @@ export default function WelcomePage() {
   return (
     <main
       className={cn(
-        "min-h-screen",
+        "app-themed min-h-screen",
         isDarkMode ? "bg-[#0F172A] text-slate-100" : "bg-[#F7F8FA] text-slate-900"
       )}
     >

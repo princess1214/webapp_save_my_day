@@ -1026,7 +1026,7 @@ function CalendarPageContent() {
   }
   if (!mounted) {
     return (
-      <main className="min-h-screen bg-[#F7F8FA] text-slate-900">
+      <main className="app-themed min-h-screen bg-[#F7F8FA] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
         <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm" />
       </main>
     );
@@ -1822,20 +1822,40 @@ function CalendarPageContent() {
 
                 <Field label="Location" darkMode={isDarkMode}>
                   <div className="space-y-2">
-                  <input
-                    value={addressQuery}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setAddressQuery(value);
-                      setNewLocation(value);
-                    }}
-                    placeholder="Clinic, school, home..."
-                    className={cn(
-                      inputClass,
-                      isDarkMode &&
-                        "border-slate-800 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:bg-slate-900"
-                    )}
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={addressQuery}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setAddressQuery(value);
+                        setNewLocation(value);
+                      }}
+                      placeholder="Clinic, school, home..."
+                      className={cn(
+                        inputClass,
+                        "flex-1",
+                        isDarkMode &&
+                          "border-slate-800 bg-slate-900 text-slate-100 placeholder:text-slate-500 focus:bg-slate-900"
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newLocation.trim()) return;
+                        window.open(
+                          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(newLocation.trim())}`,
+                          "_blank",
+                          "noopener,noreferrer"
+                        );
+                      }}
+                      className={cn(
+                        "rounded-xl border px-3 py-2 text-xs font-semibold",
+                        isDarkMode ? "border-slate-700 text-slate-200" : "border-slate-300 text-slate-700"
+                      )}
+                    >
+                      Open map
+                    </button>
+                  </div>
                     {isSearchingAddress ? (
                       <p className="text-xs text-slate-400">Searching addresses...</p>
                     ) : null}
@@ -1894,9 +1914,6 @@ function CalendarPageContent() {
                         {visionExtracting ? "Reading image..." : "Read event from image"}
                       </button>
                     ) : null}
-                    <p className="text-xs text-slate-500">
-                      Image-to-event extraction is temporarily unavailable. Upload is still supported and we kept the API code for future re-enable.
-                    </p>
                     {visionMessage ? (
                       <p className="text-xs text-emerald-600">{visionMessage}</p>
                     ) : null}

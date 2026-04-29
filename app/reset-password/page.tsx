@@ -53,7 +53,7 @@ function ResetPasswordContent() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_#fff6ef_0%,_#fdebdc_35%,_#f8d9cf_65%,_#f5cfc9_100%)]">
+    <main className="app-themed relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_#fff6ef_0%,_#fdebdc_35%,_#f8d9cf_65%,_#f5cfc9_100%)] dark:bg-slate-950 dark:text-slate-100">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-20 -left-16 h-72 w-72 rounded-full bg-white/40 blur-3xl" />
         <div className="absolute top-1/4 -right-20 h-80 w-80 rounded-full bg-rose-200/40 blur-3xl" />
@@ -239,7 +239,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[#fdebdc] text-stone-700">
+        <main className="app-themed flex min-h-screen items-center justify-center bg-[#fdebdc] text-stone-700 dark:bg-slate-950 dark:text-slate-100">
           Loading reset page...
         </main>
       }

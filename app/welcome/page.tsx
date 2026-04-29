@@ -43,7 +43,7 @@ export default function WelcomePage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center dark:bg-slate-950">
+    <main className="app-themed min-h-screen flex items-center justify-center bg-[#F7F8FA] dark:bg-slate-950 dark:text-slate-100">
       <div className="w-[380px] border rounded-2xl p-6 bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100">
         <h1 className="text-2xl font-semibold">Create account</h1>
 
