@@ -454,7 +454,7 @@ export default function HomePage() {
   return (
     <main
       className={cn(
-        "min-h-screen",
+        "app-themed min-h-screen",
         isDarkMode ? "bg-[#0F172A] text-slate-100" : "bg-[#F7F8FA] text-slate-900"
       )}
     >
