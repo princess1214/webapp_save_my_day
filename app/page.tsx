@@ -236,11 +236,13 @@ export default function WelcomePage() {
         ? new URLSearchParams(window.location.search)
         : new URLSearchParams();
     const invitedFamilyId = params.get("familyId") || params.get("familyAccount");
-    const generatedAccountId = `${Date.now().toString().slice(-9)}${Math.floor(Math.random() * 10_000)
+    const generatedAccountId = `${Math.floor(Math.random() * 10_000_000_000_000)
       .toString()
-      .padStart(4, "0")}`;
+      .padStart(13, "0")
+      .slice(0, 13)}`;
+    const generatedFamilyId = Math.random().toString(36).slice(2, 8).padEnd(6, "0");
     const accountId = generatedAccountId;
-    const familyId = invitedFamilyId || accountId;
+    const familyId = invitedFamilyId || generatedFamilyId;
 
     updateProfile?.({
       displayName: displayName.trim(),

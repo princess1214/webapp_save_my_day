@@ -93,6 +93,16 @@ function normalizeDate(date: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
   return date;
 }
+function getPasswordStrength(password: string): "Weak" | "Medium" | "Strong" {
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (/[A-Z]/.test(password) || /[a-z]/.test(password)) score += 1;
+  if (/[0-9]/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  if (score <= 1) return "Weak";
+  if (score <= 3) return "Medium";
+  return "Strong";
+}
 
 export default function ProfilePage() {
   const store = useAssistMyDayStore() as any;
@@ -113,6 +123,7 @@ export default function ProfilePage() {
   const logout = store.logout;
   const deleteAccount = store.deleteAccount;
   const updateEvent = store.updateEvent;
+  const deleteEvent = store.deleteEvent;
 
   const appPreferences = store.appPreferences || {};
 
@@ -192,9 +203,6 @@ export default function ProfilePage() {
   );
   const [dndStartTime, setDndStartTime] = useState(appPreferences.dndStartTime ?? "21:00");
   const [dndEndTime, setDndEndTime] = useState(appPreferences.dndEndTime ?? "07:00");
-  const [shareDataWithDeveloper, setShareDataWithDeveloper] = useState(
-    appPreferences.shareDataWithDeveloper ?? false
-  );
   const [temperatureUnit, setTemperatureUnit] = useState<"C" | "F">(
     appPreferences.temperatureUnit ?? "C"
   );
@@ -209,11 +217,7 @@ export default function ProfilePage() {
           localStorage.getItem("assistmyday_account_number") ||
           ""
       );
-      setFamilyId(
-        localStorage.getItem("assistmyday_family_id") ||
-          localStorage.getItem("assistmyday_account_number") ||
-          ""
-      );
+      setFamilyId(localStorage.getItem("assistmyday_family_id") || "");
     }
   }, []);
 
@@ -313,6 +317,10 @@ export default function ProfilePage() {
       phone: "",
     });
 
+    const previousBirthday = profile?.birthday || "";
+    if (previousBirthday && previousBirthday !== birthday && typeof deleteEvent === "function") {
+      deleteEvent(getBirthdayEventIdForProfile());
+    }
     if (birthday) {
       upsertBirthdayEvent({
         eventId: getBirthdayEventIdForProfile(),
@@ -328,8 +336,8 @@ export default function ProfilePage() {
         return;
       }
 
-      if (newPasscode.length > 0 && newPasscode.length < 4) {
-        setSaveMessage("Passcode should be at least 4 characters");
+      if (newPasscode.length > 0 && getPasswordStrength(newPasscode) === "Weak") {
+        setSaveMessage("New passcode must be medium or strong");
         return;
       }
 
@@ -513,7 +521,6 @@ export default function ProfilePage() {
         doNotDisturbMode,
         dndStartTime,
         dndEndTime,
-        shareDataWithDeveloper,
         temperatureUnit,
       });
     }
@@ -582,17 +589,9 @@ export default function ProfilePage() {
                     <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
                       {resolveAccountRole() || "Family"}
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      Account ID: {accountId || "Not assigned"}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      Family ID: {familyId || "Not assigned"}
-                    </div>
                   </div>
                 </div>
-                <p className="text-sm text-slate-600">you can send issue/failure reports to the developer</p>
-                <Link href="/report-issue" className="inline-block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">Report an issue</Link>
-              </section>
+                              </section>
 
               <section className="space-y-3">
                 <button
@@ -727,20 +726,8 @@ export default function ProfilePage() {
                 </p>
 
                 <div className="mt-4 space-y-3">
-                  <ToggleRow
-                    title="Allow failure reports to developer"
-                    subtitle="When on, you can send issue/failure reports from the Report issue page"
-                    checked={shareDataWithDeveloper}
-                    onChange={(value) => {
-                      setShareDataWithDeveloper(value);
-                      if (typeof updateAppPreferences === "function") {
-                        updateAppPreferences({ shareDataWithDeveloper: value });
-                      }
-                      flashSaved("Privacy choice updated");
-                    }}
-                  />
+
                   <Link href="/report-issue" className="inline-block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">Report an issue</Link>
-                  <p className="text-sm text-slate-600">you can send issue/failure reports to the developer</p>
                 </div>
               </section>
 
@@ -765,6 +752,11 @@ export default function ProfilePage() {
           {screen === "account" ? (
             <div className="space-y-6">
               <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+                  <div>Account ID: <span className="font-semibold">{accountId || "Not assigned"}</span></div>
+                  <div>Family ID: <span className="font-semibold">{familyId || "Not assigned"}</span></div>
+                  <div>Email: <span className="font-semibold">{email || "No email added"}</span></div>
+                </div>
                 <Field label="Name">
                   <input
                     value={displayName}
@@ -777,7 +769,7 @@ export default function ProfilePage() {
                 <Field label="Email">
                   <input
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    disabled
                     className={inputClass}
                     placeholder="you@example.com"
                   />
