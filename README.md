@@ -28,3 +28,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+## Environment Variables
+- DATABASE_URL
+- DATABASE_AUTH_TOKEN (optional)
+- AUTH_SECRET
+- APP_BASE_URL
+- EMAIL_PROVIDER_API_KEY
+- EMAIL_FROM
+
+## Account deletion policy
+Deleting an account removes private records owned by that account and removes user from family members. Family-shared records from other accounts remain.
