@@ -1,0 +1,2 @@
+import crypto from "crypto";import { NextResponse } from "next/server";import { query } from "@/lib/db";import { requireSessionUser } from "@/lib/server/auth";
+export async function POST(req:Request){const u=await requireSessionUser(); const data=await req.json(); const id=crypto.randomUUID(); await query("INSERT INTO issue_reports(id,user_id,data_json) VALUES($1,$2,$3)",[id,u?.id||null,data]); return NextResponse.json({success:true,id});}
