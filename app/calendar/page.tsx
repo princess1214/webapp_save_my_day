@@ -905,7 +905,7 @@ function CalendarPageContent() {
           "rounded-2xl border p-4",
           isDarkMode
             ? "border-slate-800 bg-slate-900"
-            : "border-slate-200 bg-white"
+            : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
         )}
       >
         <div className="flex items-start gap-3">
@@ -1027,7 +1027,7 @@ function CalendarPageContent() {
   if (!mounted) {
     return (
       <main className="app-themed min-h-screen bg-[#F7F8FA] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-        <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm" />
+        <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white shadow-sm" />
       </main>
     );
   }
@@ -1041,7 +1041,7 @@ function CalendarPageContent() {
     >
       <div
         className={cn(
-          "mx-auto flex min-h-screen w-full max-w-md flex-col shadow-sm",
+          "mx-auto flex min-h-screen w-full max-w-[430px] flex-col shadow-sm",
           isDarkMode ? "bg-slate-950" : "bg-white"
         )}
       >
@@ -1074,28 +1074,6 @@ function CalendarPageContent() {
             </button>
           </div>
 
-          <div
-            className={cn(
-              "rounded-3xl px-4 py-4",
-              isDarkMode ? "bg-emerald-500/10" : "bg-emerald-50"
-            )}
-          >
-            <p className="text-lg font-semibold">
-              Shared schedule for{" "}
-              <span className="text-emerald-600">
-                {selectedMemberId === "all" ? "your family" : selectedMember?.name}
-              </span>
-            </p>
-            <p
-              className={cn(
-                "mt-1 text-sm",
-                isDarkMode ? "text-slate-400" : "text-slate-500"
-              )}
-            >
-              Keep routines, appointments, reminders, birthdays, and plans in one place.
-            </p>
-          </div>
-
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
             {familyMembers.map((member: FamilyMember) => {
               const active = selectedMemberId === member.id;
@@ -1126,20 +1104,6 @@ function CalendarPageContent() {
                 </button>
               );
             })}
-          </div>
-
-          <div className="mt-4 flex gap-2">
-            <input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search title, notes, place..."
-              className={cn(
-                "w-full rounded-2xl border px-4 py-3 text-sm outline-none",
-                isDarkMode
-                  ? "border-slate-800 bg-slate-900 text-slate-100 placeholder:text-slate-500"
-                  : "border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400"
-              )}
-            />
           </div>
 
           <div className="mt-4 flex items-center justify-between">
@@ -1520,7 +1484,7 @@ function CalendarPageContent() {
             />
             <div
               className={cn(
-                "relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl px-4 pb-6 pt-3 shadow-2xl",
+                "relative max-h-[92vh] w-full max-w-[430px] overflow-y-auto rounded-t-3xl px-4 pb-6 pt-3 shadow-2xl",
                 isDarkMode ? "bg-slate-950" : "bg-white"
               )}
             >
@@ -1860,7 +1824,7 @@ function CalendarPageContent() {
                       <p className="text-xs text-slate-400">Searching addresses...</p>
                     ) : null}
                     {showAddressSuggestions ? (
-                      <div className={cn("rounded-2xl border p-2", isDarkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white")}>
+                      <div className={cn("rounded-2xl border p-2", isDarkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]")}>
                         {addressSuggestions.map((suggestion) => (
                           <button
                             key={suggestion}
@@ -1993,7 +1957,7 @@ function ToggleRow({
     <div
       className={cn(
         "flex items-start justify-between gap-3 rounded-2xl border px-4 py-4",
-        darkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white"
+        darkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
       )}
     >
       <div className="min-w-0 flex-1">
@@ -2034,8 +1998,8 @@ function BottomTabBar({
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-1/2 z-20 flex w-full max-w-md -translate-x-1/2 border-t",
-        darkMode ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-white"
+        "fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 border-t",
+        darkMode ? "border-slate-800 bg-slate-950 pb-[env(safe-area-inset-bottom)]" : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
       )}
     >
       <TabItem href="/home" label="🏠" text="Home" active={active === "home"} />

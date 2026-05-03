@@ -460,7 +460,7 @@ export default function HomePage() {
     >
       <div
         className={cn(
-          "mx-auto flex min-h-screen w-full max-w-md flex-col shadow-sm",
+          "mx-auto flex min-h-screen w-full max-w-[430px] flex-col shadow-sm",
           isDarkMode ? "bg-slate-950" : "bg-white"
         )}
       >
@@ -751,7 +751,7 @@ export default function HomePage() {
                         "flex items-center gap-3 rounded-2xl border px-4 py-3",
                         isDarkMode
                           ? "border-slate-800 bg-slate-900"
-                          : "border-slate-200 bg-white"
+                          : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
                       )}
                     >
                       <span className={cn("h-3 w-3 rounded-full", styles.dot)} />
@@ -831,7 +831,7 @@ export default function HomePage() {
                         "block rounded-2xl border p-4",
                         isDarkMode
                           ? "border-slate-800 bg-slate-900"
-                          : "border-slate-200 bg-white"
+                          : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
                       )}
                     >
                       <div className="mb-2 flex items-center justify-between">
@@ -899,7 +899,7 @@ export default function HomePage() {
             />
             <div
               className={cn(
-                "relative w-full max-w-md rounded-t-3xl px-4 pb-6 pt-3 shadow-2xl",
+                "relative w-full max-w-[430px] rounded-t-3xl px-4 pb-6 pt-3 shadow-2xl",
                 isDarkMode ? "bg-slate-950" : "bg-white"
               )}
             >
@@ -960,7 +960,7 @@ export default function HomePage() {
 
             <div
               className={cn(
-                "relative w-full max-w-md rounded-t-[28px] px-4 pb-4 pt-3 shadow-2xl",
+                "relative w-full max-w-[430px] rounded-t-[28px] px-4 pb-4 pt-3 shadow-2xl",
                 isDarkMode ? "bg-slate-950" : "bg-white"
               )}
             >
@@ -1052,8 +1052,8 @@ function BottomTabBar({
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-1/2 z-20 flex w-full max-w-md -translate-x-1/2 border-t",
-        darkMode ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-white"
+        "fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 border-t",
+        darkMode ? "border-slate-800 bg-slate-950 pb-[env(safe-area-inset-bottom)]" : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
       )}
     >
       <TabItem href="/home" label="🏠" text="Home" active={active === "home"} />

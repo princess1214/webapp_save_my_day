@@ -565,7 +565,7 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-[#F7F8FA] text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="app-themed mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-sm dark:bg-slate-900">
+      <div className="app-themed mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white shadow-sm dark:bg-slate-900">
         {screen === "main" && renderHeader("Profile")}
         {screen === "account" && renderHeader("Account", true)}
         {screen === "notifications" && renderHeader("Notification", true)}
@@ -1130,7 +1130,7 @@ export default function ProfilePage() {
               onClick={() => setShowMemberSheet(false)}
             />
 
-            <div className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white px-4 pb-6 pt-3 shadow-2xl">
+            <div className="relative max-h-[92vh] w-full max-w-[430px] overflow-y-auto rounded-t-3xl bg-white px-4 pb-6 pt-3 shadow-2xl">
               <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
 
               <div className="mb-4 flex items-center justify-between">
@@ -1211,7 +1211,7 @@ export default function ProfilePage() {
                           "flex h-12 w-12 items-center justify-center rounded-full border text-xl",
                           memberAvatar === emoji
                             ? "border-emerald-500 bg-emerald-50"
-                            : "border-slate-200 bg-white"
+                            : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
                         )}
                       >
                         {emoji}
@@ -1390,7 +1390,7 @@ function ConfirmModal({
 
 function BottomTabBar({ active }: { active: string }) {
   return (
-    <nav className="fixed bottom-0 left-1/2 z-20 flex w-full max-w-md -translate-x-1/2 border-t border-slate-200 bg-white">
+    <nav className="fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
       <TabItem href="/home" label="🏠" text="Home" active={active === "home"} />
       <TabItem href="/calendar" label="📅" text="Calendar" active={active === "calendar"} />
       <TabItem href="/health" label="❤️" text="Health" active={active === "health"} />

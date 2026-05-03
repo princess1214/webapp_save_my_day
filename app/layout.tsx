@@ -7,6 +7,13 @@ export const metadata: Metadata = {
   description: "A warm place for your family’s everyday life",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover" as const,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
