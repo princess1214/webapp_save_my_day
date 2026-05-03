@@ -751,7 +751,7 @@ export default function HomePage() {
                         "flex items-center gap-3 rounded-2xl border px-4 py-3",
                         isDarkMode
                           ? "border-slate-800 bg-slate-900"
-                          : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+                          : "border-slate-200 bg-white"
                       )}
                     >
                       <span className={cn("h-3 w-3 rounded-full", styles.dot)} />
@@ -831,7 +831,7 @@ export default function HomePage() {
                         "block rounded-2xl border p-4",
                         isDarkMode
                           ? "border-slate-800 bg-slate-900"
-                          : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+                          : "border-slate-200 bg-white"
                       )}
                     >
                       <div className="mb-2 flex items-center justify-between">
@@ -1053,7 +1053,7 @@ function BottomTabBar({
     <nav
       className={cn(
         "fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 border-t",
-        darkMode ? "border-slate-800 bg-slate-950 pb-[env(safe-area-inset-bottom)]" : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+        darkMode ? "border-slate-800 bg-slate-950" : "border-slate-200 bg-white"
       )}
     >
       <TabItem href="/home" label="🏠" text="Home" active={active === "home"} />

@@ -40,6 +40,8 @@ type CalendarEvent = {
   recurrenceEveryHours?: string;
   reminderMinutes?: string;
   imageDataUrl?: string;
+  createdByName?: string;
+  createdByAccountId?: string;
 };
 
 type VisionExtractResult = {
@@ -212,7 +214,7 @@ function getCategoryStyle(category: EventCategory, darkMode: boolean) {
       };
     case "school":
       return {
-        dot: "bg-emerald-500",
+        dot: "bg-yellow-400",
         badge: darkMode
           ? "bg-emerald-500/15 text-emerald-300"
           : "bg-emerald-50 text-emerald-700",
@@ -281,6 +283,7 @@ function CalendarPageContent() {
     "all" | EventCategory
   >("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -448,6 +451,11 @@ function CalendarPageContent() {
   const selectedMember =
     familyMembers.find((member: FamilyMember) => member.id === selectedMemberId) ??
     familyMembers[0];
+  const creatorName =
+    store?.profile?.displayName?.trim() ||
+    store?.profile?.firstName?.trim() ||
+    "Unknown";
+  const creatorAccountId = store?.profile?.email?.trim() || "local-user";
 
   const selectedDayEvents = useMemo(() => {
     const events = (getEventsForDate?.(
@@ -774,6 +782,8 @@ function CalendarPageContent() {
         newRecurrence === "custom" ? newRecurrenceEveryHours : "",
       reminderMinutes: newReminderMinutes,
       imageDataUrl: newImageDataUrl || uploadPreview,
+      createdByName: formMode === "edit" ? (store.events || []).find((event: CalendarEvent) => event.id === baseId)?.createdByName || creatorName : creatorName,
+      createdByAccountId: formMode === "edit" ? (store.events || []).find((event: CalendarEvent) => event.id === baseId)?.createdByAccountId || creatorAccountId : creatorAccountId,
     };
 
     setEventsError("");
@@ -905,7 +915,7 @@ function CalendarPageContent() {
           "rounded-2xl border p-4",
           isDarkMode
             ? "border-slate-800 bg-slate-900"
-            : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+            : "border-slate-200 bg-white"
         )}
       >
         <div className="flex items-start gap-3">
@@ -985,11 +995,11 @@ function CalendarPageContent() {
                 isDarkMode ? "text-slate-500" : "text-slate-400"
               )}
             >
-              For:{" "}
+              For 
               {familyMembers
                 .filter((member: FamilyMember) => event.memberIds.includes(member.id))
                 .map((member: FamilyMember) => member.name)
-                .join(", ") || "Family"}
+                .join(", ") || "Family"} · by {event.createdByName || "Unknown"}
             </p>
 
             {event.location ? (
@@ -1066,12 +1076,10 @@ function CalendarPageContent() {
               <h1 className="text-lg font-semibold">Calendar</h1>
             </div>
 
-            <button
-              onClick={openCreateEvent}
-              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
-            >
-              + Event
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowSearchPanel(true)} className={cn("rounded-full border px-3 py-2 text-sm", isDarkMode ? "border-slate-700 bg-slate-900 text-slate-200" : "border-slate-200 bg-white text-slate-700")}>🔍</button>
+              <button onClick={openCreateEvent} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">+ Event</button>
+            </div>
           </div>
 
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -1225,7 +1233,8 @@ function CalendarPageContent() {
                   const key = formatDateKey(cell.date);
                   const isSelected = key === selectedDate;
                   const isToday = key === todayKey;
-                  const count = eventCountByDate.get(key) ?? 0;
+                  const dayEvents = filterEventsForMemberView((((getEventsForDate?.(key, selectedMemberId, selectedCategoryFilter, searchTerm) || []) as CalendarEvent[])), selectedMemberId);
+                  const dots = dayEvents.slice(0, 3);
                   const hasSpan = spanningEventByDate.get(key);
 
                   return (
@@ -1261,29 +1270,13 @@ function CalendarPageContent() {
                         </span>
                       </div>
 
-                      <div className="mt-2 flex items-center gap-1">
-                        {count > 0 ? (
-                          <>
-                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                            <span
-                              className={cn(
-                                "text-[10px]",
-                                isDarkMode ? "text-slate-400" : "text-slate-500"
-                              )}
-                            >
-                              {count}
-                            </span>
-                          </>
-                        ) : (
+                      <div className="mt-2 flex h-2 items-center gap-1">
+                        {dots.map((event, index) => (
                           <span
-                            className={cn(
-                              "text-[10px]",
-                              isDarkMode ? "text-slate-700" : "text-slate-300"
-                            )}
-                          >
-                            —
-                          </span>
-                        )}
+                            key={`${event.id}-${index}`}
+                            className={cn("h-1.5 w-1.5 rounded-full", getCategoryStyle(event.category, isDarkMode).dot)}
+                          />
+                        ))}
                       </div>
                       {hasSpan ? (
                         <div className="mt-1 h-1 w-full rounded-full bg-emerald-400/70" />
@@ -1470,6 +1463,25 @@ function CalendarPageContent() {
           </section>
         </div>
 
+
+        {showSearchPanel ? (
+          <div className="fixed inset-0 z-40 bg-black/40">
+            <div className={cn("mx-auto h-full w-full max-w-[430px] p-4", isDarkMode ? "bg-slate-950" : "bg-white")}>
+              <div className="mb-3 flex items-center gap-2">
+                <button onClick={() => setShowSearchPanel(false)} className={cn("rounded-full border px-3 py-2 text-sm", isDarkMode ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white")}>← Back</button>
+                <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search events" className={inputClass} />
+              </div>
+              <div className="space-y-3">
+                {filterEventsForMemberView((((store.events || []) as CalendarEvent[]).filter((event) => `${event.title} ${event.notes || ""} ${event.location || ""}`.toLowerCase().includes(searchTerm.toLowerCase()))), selectedMemberId).map((event) => (
+                  <button key={event.id+event.date} onClick={() => { setShowSearchPanel(false); setSelectedDate(event.date); openEditEvent(event); }} className={cn("w-full rounded-2xl border p-3 text-left", isDarkMode ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white")}>
+                    <div className="text-sm font-semibold">{event.title}</div>
+                    <div className={cn("text-xs", isDarkMode ? "text-slate-400" : "text-slate-500")}>{formatFriendlyDate(event.date, prefs.dateFormat)} {event.allDay ? "All day" : formatDisplayTime(event.time, prefs.timeFormat)}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
         <BottomTabBar active="calendar" darkMode={isDarkMode} />
 
         {showCreateSheet ? (
@@ -1824,7 +1836,7 @@ function CalendarPageContent() {
                       <p className="text-xs text-slate-400">Searching addresses...</p>
                     ) : null}
                     {showAddressSuggestions ? (
-                      <div className={cn("rounded-2xl border p-2", isDarkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]")}>
+                      <div className={cn("rounded-2xl border p-2", isDarkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white")}>
                         {addressSuggestions.map((suggestion) => (
                           <button
                             key={suggestion}
@@ -1957,7 +1969,7 @@ function ToggleRow({
     <div
       className={cn(
         "flex items-start justify-between gap-3 rounded-2xl border px-4 py-4",
-        darkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+        darkMode ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white"
       )}
     >
       <div className="min-w-0 flex-1">
@@ -1999,7 +2011,7 @@ function BottomTabBar({
     <nav
       className={cn(
         "fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 border-t",
-        darkMode ? "border-slate-800 bg-slate-950 pb-[env(safe-area-inset-bottom)]" : "border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+        darkMode ? "border-slate-800 bg-slate-950 " : "border-slate-200 bg-white"
       )}
     >
       <TabItem href="/home" label="🏠" text="Home" active={active === "home"} />
