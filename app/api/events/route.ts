@@ -6,7 +6,7 @@ export async function GET() {
   const user = await requireSessionUser();
   if (!user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   const res = await query<{ data_json: any }>("SELECT data_json FROM events WHERE user_id=$1 ORDER BY created_at DESC", [user.id]);
-  return NextResponse.json({ events: res.rows.map((r) => r.data_json) });
+  return NextResponse.json({ events: res.rows.map((r: { data_json: any }) => r.data_json) });
 }
 
 export async function POST(req: Request) {

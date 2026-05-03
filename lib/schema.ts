@@ -27,6 +27,9 @@ export function ensureSchema() {
     await query(`CREATE TABLE IF NOT EXISTS health_records (id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,data_json JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
     await query(`CREATE TABLE IF NOT EXISTS preferences (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,data_json JSONB NOT NULL DEFAULT '{}'::jsonb,updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
     await query(`CREATE TABLE IF NOT EXISTS family_members (id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,name TEXT NOT NULL,role TEXT,birthday DATE,type TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
-  })();
+  })().catch((error) => {
+    ready = null;
+    throw error;
+  });
   return ready;
 }

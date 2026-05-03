@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createSession, hashPassword, insertLoginHistory } from "@/lib/server/auth";
 import { query } from "@/lib/db";
+import { ensureSchema } from "@/lib/schema";
 
 export async function POST(req: Request) {
+  await ensureSchema();
   const body = await req.json();
   const email = String(body.email || "").toLowerCase();
   const password = String(body.password || "");
