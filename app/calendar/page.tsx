@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAssistMyDayStore } from "../../lib/assistmyday-store";
+import { getSession } from "../../lib/auth-api";
 import {
   apiCreateEvent,
   apiDeleteEvent,
@@ -327,6 +328,7 @@ function CalendarPageContent() {
   const [activeReminder, setActiveReminder] = useState<CalendarEvent | null>(null);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const imageExtractionEnabled = false;
 
   const prefs = {
@@ -356,6 +358,26 @@ function CalendarPageContent() {
 
   useEffect(() => {
     let cancelled = false;
+    async function loadSession() {
+      try {
+        await getSession();
+        if (!cancelled) setIsAuthenticated(true);
+      } catch {
+        if (!cancelled) {
+          setIsAuthenticated(false);
+          setEvents?.([]);
+          setEventsError("Please log in to save calendar events.");
+        }
+      }
+    }
+    loadSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [setEvents, isAuthenticated]);
+
+  useEffect(() => {
+    let cancelled = false;
 
     async function loadEvents() {
       setEventsLoading(true);
@@ -376,6 +398,7 @@ function CalendarPageContent() {
       }
     }
 
+    if (!isAuthenticated) return;
     loadEvents();
 
     return () => {
@@ -600,12 +623,22 @@ function CalendarPageContent() {
   }
 
   function openCreateEvent() {
+    if (!isAuthenticated) {
+      setEventsError("Please log in to save calendar events.");
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return;
+    }
     resetCreateForm();
     setFormMode("create");
     setShowCreateSheet(true);
   }
 
   function openEditEvent(event: CalendarEvent) {
+    if (!isAuthenticated) {
+      setEventsError("Please log in to save calendar events.");
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return;
+    }
     setFormMode("edit");
     setEditingEventId(event.id.includes("_") ? event.id.split("_")[0] : event.id);
     setEditingOccurrenceDate(event.date);
@@ -748,6 +781,11 @@ function CalendarPageContent() {
   }
 
   async function handleSaveEvent() {
+    if (!isAuthenticated) {
+      setEventsError("Please log in to save calendar events.");
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return;
+    }
     if (!newTitle.trim()) return;
     if (!newDate) return;
     if (!newAllDay && !newTime) return;
@@ -806,6 +844,11 @@ function CalendarPageContent() {
 
 
   async function handleDeleteEditingEvent() {
+    if (!isAuthenticated) {
+      setEventsError("Please log in to save calendar events.");
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return;
+    }
     if (!editingEventId) return;
 
     const isRecurring = newRecurrence !== "do-not-repeat";
