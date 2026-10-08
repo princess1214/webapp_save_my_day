@@ -1,7 +1,3 @@
-const STORAGE_KEY = "demo_user";
-const SESSION_KEY = "demo_session";
-const MAILBOX_KEY = "demo_mailbox";
-
 export type SessionUser = {
   email: string;
   fullName?: string;
@@ -11,61 +7,13 @@ export type SessionUser = {
   familyId?: string;
 };
 
-type LoginContext = {
-  userAgent?: string;
-  ip?: string | null;
-  location?: string;
-  loggedAt: string;
-};
-
-function delay(ms = 500) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function generateAccountNumber() {
-  return `${Math.floor(Math.random() * 10_000_000_000_000)
-    .toString()
-    .padStart(13, "0")
-    .slice(0, 13)}`;
-}
-
-function generateFamilyId() {
-  return Math.random().toString(36).slice(2, 8).padEnd(6, "0");
-}
-
-async function fetchLoginContext(): Promise<LoginContext> {
-  try {
-    const res = await fetch("/api/auth/context", { cache: "no-store" });
-    if (!res.ok) {
-      return {
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "Unknown device",
-        location: "Unknown location",
-        loggedAt: new Date().toISOString(),
-      };
-    }
-
-    const data = await res.json();
-    return {
-      userAgent: data.userAgent,
-      ip: data.ip,
-      location: data.location,
-      loggedAt: new Date().toISOString(),
-    };
-  } catch {
-    return {
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "Unknown device",
-      location: "Unknown location",
-      loggedAt: new Date().toISOString(),
-    };
-  }
-}
-
 export async function signup(payload: {
   email: string;
   password: string;
   fullName?: string;
   birthday?: string;
   role?: string;
+  inviteToken?: string;
 }) {
   const res = await fetch("/api/auth/signup", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
   const data = await res.json();
@@ -117,10 +65,6 @@ export async function requestPasswordReset({ email }: { email: string }) {
   return data;
 }
 
-export async function verifyResetToken(token: string) {
-  await delay();
-  return { valid: true };
-}
 export async function resetPassword({
   token,
   password,

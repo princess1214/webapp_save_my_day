@@ -197,15 +197,12 @@ export default function HomePage() {
 
   const [dateLabel, setDateLabel] = useState("");
   const [greeting, setGreeting] = useState("Good morning");
-  const [mounted, setMounted] = useState(false);
   const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [showQuickLogSheet, setShowQuickLogSheet] = useState(false);
   const [quickLogCategory, setQuickLogCategory] = useState<MomentCategory>("sleep");
   const [quickLogText, setQuickLogText] = useState("");
-  const [inviteCopied, setInviteCopied] = useState(false);
-  const [inviteLink, setInviteLink] = useState("");
   const [dailyCheerMessage, setDailyCheerMessage] = useState("");
   const [weatherSummary, setWeatherSummary] = useState("");
 
@@ -219,8 +216,6 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    setMounted(true);
-
     const now = new Date();
     const hour = now.getHours();
 
@@ -325,26 +320,6 @@ export default function HomePage() {
     return familyMembers || [];
   }, [familyMembers]);
 
-  const actualFamilyMembers = useMemo(() => {
-    return (familyMembers || []).filter((member: any) => member.id !== ALL_MEMBER_ID);
-  }, [familyMembers]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const inviterParam = encodeURIComponent(displayName || "Family Organizer");
-    const familyParam = encodeURIComponent(
-      actualFamilyMembers.map((member: any) => member.name).join(",")
-    );
-    const familyId = encodeURIComponent(
-      localStorage.getItem("assistmyday_family_id") ||
-        localStorage.getItem("assistmyday_account_number") ||
-        ""
-    );
-    setInviteLink(
-      `${window.location.origin}/?invite=1&family=${familyParam}&inviter=${inviterParam}&familyId=${familyId}`
-    );
-  }, [mounted, actualFamilyMembers, displayName]);
-
   const selectedMember =
     selectableMembers.find((member: any) => member.id === selectedMemberId) ??
     selectableMembers[0];
@@ -438,17 +413,6 @@ export default function HomePage() {
     setQuickLogText("");
     setQuickLogCategory("sleep");
     setShowQuickLogSheet(false);
-  }
-
-  async function copyInviteLink() {
-    if (!inviteLink) return;
-    try {
-      await navigator.clipboard.writeText(inviteLink);
-      setInviteCopied(true);
-      setTimeout(() => setInviteCopied(false), 1800);
-    } catch {
-      setInviteCopied(false);
-    }
   }
 
   return (
@@ -928,23 +892,14 @@ export default function HomePage() {
                     : "border-slate-200 bg-slate-50"
                 )}
               >
-                <div className={cn("text-sm font-medium", isDarkMode ? "text-slate-100" : "text-slate-800")}>
-                  Share this invite link
-                </div>
-                <div className={cn("mt-2 break-all text-sm", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                  {mounted ? inviteLink : "Preparing invite link..."}
-                </div>
+                <div className={cn("text-sm font-medium", isDarkMode ? "text-slate-100" : "text-slate-800")}>Secure family invitations</div>
+                <div className={cn("mt-2 text-sm", isDarkMode ? "text-slate-400" : "text-slate-500")}>Invitations are sent by email, bound to the recipient, and expire after seven days.</div>
               </div>
 
-              <button
-                onClick={copyInviteLink}
-                className="mt-4 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white"
-              >
-                {inviteCopied ? "Copied!" : "Copy invite link"}
-              </button>
+              <Link href="/family" className="mt-4 block w-full rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white">Manage invitations</Link>
 
               <p className={cn("mt-3 text-sm", isDarkMode ? "text-slate-500" : "text-slate-400")}>
-                Anyone who registers with this link can be added to the same family.
+                Only the invited email can use the secure invitation token.
               </p>
             </div>
           </div>

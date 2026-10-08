@@ -2,6 +2,23 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import {
+  apiChangePassword,
+  apiCreateFamilyMember,
+  apiCreateHealthRecord,
+  apiCreateJournal,
+  apiDeleteFamilyMember,
+  apiDeleteAccount,
+  apiDeleteHealthRecord,
+  apiDeleteJournal,
+  apiUpdateFamilyMember,
+  apiUpdateHealthRecord,
+  apiUpdateJournal,
+  apiUpdatePreferences,
+  apiUpdateProfile,
+  type CloudData,
+} from "./api-client";
+import { logout as apiLogout } from "./auth-api";
 
 export type EventCategory = "health" | "school" | "event" | "finance";
 export type Importance = "low" | "normal" | "high";
@@ -26,6 +43,8 @@ export type Profile = {
   role: string;
   birthday: string;
   passcode: string;
+  accountId?: string;
+  familyId?: string;
 };
 
 export type FamilyMember = {
@@ -61,6 +80,9 @@ export type CalendarEvent = {
   reminderMinutes?: string;
   excludedDates?: string[];
   imageDataUrl?: string;
+  visibility?: "family" | "private";
+  createdByName?: string;
+  createdByAccountId?: string;
 };
 
 export type JournalPost = {
@@ -119,6 +141,8 @@ type AssistMyDayStore = {
   journalPosts: JournalPost[];
   appPreferences: AppPreferences;
 
+  hydrateCloudData: (data: CloudData) => void;
+
   updateProfile: (updates: Partial<Profile>) => void;
 
   addFamilyMember: (
@@ -133,7 +157,7 @@ type AssistMyDayStore = {
   updatePasscode: (payload: {
     currentPasscode: string;
     newPasscode: string;
-  }) => boolean;
+  }) => Promise<boolean>;
 
   updateAppPreferences: (updates: Partial<AppPreferences>) => void;
 
@@ -454,6 +478,13 @@ function getColorForIndex(index: number) {
   return MEMBER_COLORS[index % MEMBER_COLORS.length];
 }
 
+function reportSyncError(error: unknown) {
+  console.error("AssistMyDay cloud sync failed", error instanceof Error ? error.message : error);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("assistmyday-sync-error", { detail: error instanceof Error ? error.message : "Cloud sync failed" }));
+  }
+}
+
 function buildInitialState() {
   return {
     isAuthenticated: true,
@@ -471,6 +502,26 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
     (set, get) => ({
       ...buildInitialState(),
 
+      hydrateCloudData: (data) => {
+        const profile = { ...defaultProfile, ...(data.profile || {}), passcode: "" } as Profile;
+        set((state) => ({
+          isAuthenticated: true,
+          profile,
+          familyMembers: normalizeFamilyMembers(profile, data.familyMembers || []),
+          events: withFederalHolidays(data.events || []),
+          journalPosts: data.journalPosts || [],
+          healthRecords: data.healthRecords || [],
+          appPreferences: {
+            ...state.appPreferences,
+            ...(data.appPreferences || {}),
+            categoryDisplay: {
+              ...state.appPreferences.categoryDisplay,
+              ...(data.appPreferences?.categoryDisplay || {}),
+            },
+          },
+        }));
+      },
+
       updateProfile: (updates) => {
         set((state) => {
           const nextProfile = {
@@ -483,6 +534,10 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
             familyMembers: normalizeFamilyMembers(nextProfile, state.familyMembers),
           };
         });
+        const safeUpdates = { ...updates };
+        delete safeUpdates.passcode;
+        delete safeUpdates.email;
+        void apiUpdateProfile(safeUpdates).catch(reportSyncError);
       },
 
       addFamilyMember: (member) => {
@@ -516,6 +571,8 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
           ]),
         }));
 
+        void apiCreateFamilyMember(newMember).catch(reportSyncError);
+
         return id;
       },
 
@@ -530,6 +587,8 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
             )
           ),
         }));
+        const member = get().familyMembers.find((item) => item.id === memberId);
+        if (member) void apiUpdateFamilyMember(member).catch(reportSyncError);
       },
 
       deleteFamilyMember: (memberId) => {
@@ -555,23 +614,17 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
             };
           }),
         }));
+        void apiDeleteFamilyMember(memberId).catch(reportSyncError);
       },
 
-      updatePasscode: ({ currentPasscode, newPasscode }) => {
-        const currentStoredPasscode = get().profile.passcode || "";
-
-        if (currentStoredPasscode && currentStoredPasscode !== currentPasscode) {
+      updatePasscode: async ({ currentPasscode, newPasscode }) => {
+        try {
+          await apiChangePassword(currentPasscode, newPasscode);
+          return true;
+        } catch (error) {
+          reportSyncError(error);
           return false;
         }
-
-        set((state) => ({
-          profile: {
-            ...state.profile,
-            passcode: newPasscode,
-          },
-        }));
-
-        return true;
       },
 
       updateAppPreferences: (updates) => {
@@ -585,38 +638,35 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
             },
           },
         }));
+        void apiUpdatePreferences(updates).catch(reportSyncError);
       },
 
       logout: () => {
         set(() => ({
           isAuthenticated: false,
         }));
+        void apiLogout().catch(reportSyncError);
       },
 
       deleteAccount: () => {
-        const blankProfile = {
-          ...defaultProfile,
-          displayName: "",
-          email: "",
-          birthday: "",
-          role: "",
-          passcode: "",
-        };
-
-        set(() => ({
-          ...buildInitialState(),
-          isAuthenticated: false,
-          profile: blankProfile,
-          familyMembers: normalizeFamilyMembers(blankProfile, []),
-          events: [],
-          journalPosts: [],
-          healthRecords: [],
-        }));
+        void apiDeleteAccount().then(() => {
+          const blankProfile = { ...defaultProfile };
+          set(() => ({
+            ...buildInitialState(),
+            isAuthenticated: false,
+            profile: blankProfile,
+            familyMembers: normalizeFamilyMembers(blankProfile, []),
+            events: [],
+            journalPosts: [],
+            healthRecords: [],
+          }));
+        }).catch(reportSyncError);
       },
       addHealthRecord: (record) => {
         set((state) => ({
           healthRecords: [record, ...state.healthRecords],
         }));
+        void apiCreateHealthRecord(record).catch(reportSyncError);
       },
 
       updateHealthRecord: (record) => {
@@ -625,12 +675,14 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
             item.id === record.id ? record : item
           ),
         }));
+        void apiUpdateHealthRecord(record).catch(reportSyncError);
       },
 
       deleteHealthRecord: (recordId) => {
         set((state) => ({
           healthRecords: state.healthRecords.filter((item) => item.id !== recordId),
         }));
+        void apiDeleteHealthRecord(recordId).catch(reportSyncError);
       },
 
       setEvents: (events) => {
@@ -757,6 +809,7 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
         set((state) => ({
           journalPosts: [post, ...state.journalPosts],
         }));
+        void apiCreateJournal(post).catch(reportSyncError);
       },
       updateJournalPost: (post) => {
         set((state) => ({
@@ -764,12 +817,14 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
             item.id === post.id ? post : item
           ),
         }));
+        void apiUpdateJournal(post).catch(reportSyncError);
       },
 
       deleteJournalPost: (postId) => {
         set((state) => ({
           journalPosts: state.journalPosts.filter((post) => post.id !== postId),
         }));
+        void apiDeleteJournal(postId).catch(reportSyncError);
       },
     }),
     {
@@ -798,7 +853,7 @@ export const useAssistMyDayStore = create<AssistMyDayStore>()(
       migrate: (persistedState: any) => persistedState,
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
-        profile: state.profile,
+        profile: { ...state.profile, passcode: "" },
         familyMembers: state.familyMembers,
         events: state.events,
         journalPosts: state.journalPosts,

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { SELF_MEMBER_ID, useAssistMyDayStore } from "../../lib/assistmyday-store";
+import { SELF_MEMBER_ID, useAssistMyDayStore, type CalendarEvent } from "../../lib/assistmyday-store";
+import { apiCreateEvent, apiDeleteEvent, apiUpdateEvent } from "../../lib/api-client";
 
 type EventCategory = "health" | "school" | "event" | "finance";
 type Screen =
@@ -137,7 +138,6 @@ export default function ProfilePage() {
     : "Custom";
 
   const [screen, setScreen] = useState<Screen>("main");
-  const [mounted, setMounted] = useState(false);
 
   const [displayName, setDisplayName] = useState(profile?.displayName || "");
   const [email, setEmail] = useState(profile?.email || "");
@@ -166,8 +166,6 @@ export default function ProfilePage() {
   const [showDeleteLinkedMemberConfirm, setShowDeleteLinkedMemberConfirm] = useState(false);
   const [pendingDeleteMemberId, setPendingDeleteMemberId] = useState<string | null>(null);
 
-  const [inviteLink, setInviteLink] = useState("");
-  const [inviteCopied, setInviteCopied] = useState(false);
   const [accountId, setAccountId] = useState("");
   const [familyId, setFamilyId] = useState("");
 
@@ -210,16 +208,9 @@ export default function ProfilePage() {
   const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
-    setMounted(true);
-    if (typeof window !== "undefined") {
-      setAccountId(
-        localStorage.getItem("assistmyday_account_id") ||
-          localStorage.getItem("assistmyday_account_number") ||
-          ""
-      );
-      setFamilyId(localStorage.getItem("assistmyday_family_id") || "");
-    }
-  }, []);
+    setAccountId(profile?.accountId || "");
+    setFamilyId(profile?.familyId || "");
+  }, [profile?.accountId, profile?.familyId]);
 
   useEffect(() => {
     const roleValue = profile?.role || "Mom";
@@ -234,19 +225,6 @@ export default function ProfilePage() {
     setCustomRole(nextSelection === "Custom" ? roleValue : "");
   }, [profile]);
 
-  useEffect(() => {
-    if (!mounted) return;
-    const origin = window.location.origin;
-    const inviter = encodeURIComponent(displayName || "Family Organizer");
-    const activeFamilyId = encodeURIComponent(
-      familyId ||
-        localStorage.getItem("assistmyday_family_id") ||
-        localStorage.getItem("assistmyday_account_number") ||
-        ""
-    );
-    setInviteLink(`${origin}/?invite=1&inviter=${inviter}&familyId=${activeFamilyId}`);
-  }, [mounted, displayName, familyId]);
-
   function flashSaved(message = "Saved") {
     setSaveMessage(message);
     window.setTimeout(() => setSaveMessage(""), 1800);
@@ -256,7 +234,7 @@ export default function ProfilePage() {
     return roleSelection === "Custom" ? customRole.trim() : roleSelection;
   }
 
-  function upsertBirthdayEvent(params: {
+  async function upsertBirthdayEvent(params: {
     eventId: string;
     title: string;
     date: string;
@@ -267,7 +245,7 @@ export default function ProfilePage() {
 
     const existing = (events || []).find((event: any) => event.id === params.eventId);
 
-    const birthdayEvent = {
+    const birthdayEvent: CalendarEvent = {
       id: params.eventId,
       title: params.title,
       date: safeDate,
@@ -287,16 +265,17 @@ export default function ProfilePage() {
     };
 
     if (existing && typeof updateEvent === "function") {
-      updateEvent(birthdayEvent);
+      const saved = await apiUpdateEvent(birthdayEvent.id, birthdayEvent);
+      updateEvent(saved);
       return;
     }
 
     if (!existing) {
-      addEvent(birthdayEvent);
+      addEvent(await apiCreateEvent(birthdayEvent));
     }
   }
 
-  function handleSaveAccount() {
+  async function handleSaveAccount() {
     const resolvedRole = resolveAccountRole();
 
     if (!displayName.trim()) {
@@ -319,10 +298,11 @@ export default function ProfilePage() {
 
     const previousBirthday = profile?.birthday || "";
     if (previousBirthday && previousBirthday !== birthday && typeof deleteEvent === "function") {
+      await apiDeleteEvent(getBirthdayEventIdForProfile()).catch(() => undefined);
       deleteEvent(getBirthdayEventIdForProfile());
     }
     if (birthday) {
-      upsertBirthdayEvent({
+      await upsertBirthdayEvent({
         eventId: getBirthdayEventIdForProfile(),
         title: formatBirthdayTitle(displayName.trim() || "My"),
         date: birthday,
@@ -342,10 +322,17 @@ export default function ProfilePage() {
       }
 
       if (typeof updatePasscode === "function") {
-        updatePasscode({
+        const changed = await updatePasscode({
           currentPasscode,
           newPasscode,
         });
+        if (!changed) {
+          setSaveMessage("Current passcode is incorrect or the update failed");
+          return;
+        }
+        setSaveMessage("Passcode updated. Please sign in again.");
+        window.setTimeout(() => window.location.assign("/login"), 600);
+        return;
       }
     }
 
@@ -487,17 +474,6 @@ export default function ProfilePage() {
     setShowDeleteMemberConfirm(false);
     setShowDeleteLinkedMemberConfirm(false);
     flashSaved("Family member deleted");
-  }
-
-  async function copyInviteLink() {
-    if (!inviteLink) return;
-    try {
-      await navigator.clipboard.writeText(inviteLink);
-      setInviteCopied(true);
-      setTimeout(() => setInviteCopied(false), 1800);
-    } catch {
-      setInviteCopied(false);
-    }
   }
 
   function saveNotifications() {
@@ -677,17 +653,13 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white p-4">
-                    <div className="text-sm font-semibold text-slate-800">Invite new member</div>
-                    <div className="mt-2 break-all text-sm text-slate-500">
-                      {mounted ? inviteLink : "Preparing invite link..."}
+                    <div className="text-sm font-semibold text-slate-800">Adult accounts & invitations</div>
+                    <div className="mt-2 text-sm text-slate-500">
+                      Send secure, email-bound invitations and manage adult account roles.
                     </div>
-
-                    <button
-                      onClick={copyInviteLink}
-                      className="mt-3 w-full rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white"
-                    >
-                      {inviteCopied ? "Copied!" : "Copy invite link"}
-                    </button>
+                    <Link href="/family" className="mt-3 block w-full rounded-2xl bg-emerald-600 px-4 py-3 text-center text-sm font-semibold text-white">
+                      Manage family accounts
+                    </Link>
                   </div>
                 </div>
 
