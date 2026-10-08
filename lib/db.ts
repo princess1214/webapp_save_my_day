@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 let pool: Pool | null = null;
 
@@ -15,4 +15,19 @@ function getPool() {
 
 export async function query<T = any>(text: string, params: unknown[] = []) {
   return getPool().query<T>(text, params);
+}
+
+export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>) {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }

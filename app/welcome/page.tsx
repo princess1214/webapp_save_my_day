@@ -1,15 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signup } from '@/lib/auth-api';
 
-export default function WelcomePage() {
+function WelcomePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get('invite') || undefined;
+  const invitedEmail = searchParams.get('email') || '';
   const [form, setForm] = useState({
     fullName: '',
-    email: '',
+    email: invitedEmail,
     password: '',
     birthday: '',
     role: '',
@@ -30,7 +33,7 @@ export default function WelcomePage() {
     setInfo('');
 
     try {
-      const res = await signup(form);
+      const res = await signup({ ...form, inviteToken });
       if (res?.welcomeEmailQueued) {
         setInfo('Welcome message was sent to your mailbox (demo).');
       }
@@ -56,6 +59,7 @@ export default function WelcomePage() {
 
           <input
             placeholder="Email"
+            value={form.email}
             className="w-full border p-2 rounded"
             onChange={(e) => onChange('email', e.target.value)}
             required
@@ -121,5 +125,13 @@ export default function WelcomePage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function WelcomePage() {
+  return (
+    <Suspense fallback={null}>
+      <WelcomePageContent />
+    </Suspense>
   );
 }
