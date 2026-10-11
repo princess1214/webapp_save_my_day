@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
-import { createSession, hashPassword, insertLoginHistory } from "@/lib/server/auth";
+import { z } from "zod";
 import { query } from "@/lib/db";
 import { ensureSchema } from "@/lib/schema";
+import { createSession, insertLoginHistory, verifyPassword } from "@/lib/server/auth";
+import { checkRateLimit, jsonError, serverError } from "@/lib/server/api";
+
+const schema = z.object({ email: z.string().trim().email().max(254), password: z.string().min(1).max(128) });
 
 export async function POST(req: Request) {
-  await ensureSchema();
-  const body = await req.json();
-  const email = String(body.email || "").toLowerCase();
-  const password = String(body.password || "");
-  const u = await query<{ id: string; password_salt: string; password_hash: string; data_json: any; family_id: string; account_id: string }>("SELECT id,password_salt,password_hash,data_json,family_id,account_id FROM users WHERE email=$1", [email]);
-  const row = u.rows[0]; if (!row) return NextResponse.json({ message: "Invalid email or passcode" }, { status: 401 });
-  if ((await hashPassword(password, row.password_salt)).hash !== row.password_hash) return NextResponse.json({ message: "Invalid email or passcode" }, { status: 401 });
-  await createSession(row.id); await insertLoginHistory(row.id);
-  return NextResponse.json({ success: true, user: { email, familyId: row.family_id, accountId: row.account_id, ...(row.data_json || {}) } });
+  try {
+    await ensureSchema();
+    if (!(await checkRateLimit(req, "login", 10, 15))) return jsonError("Too many login attempts. Please try again later.", 429);
+    const parsed = schema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) return jsonError("Invalid email or passcode.", 401);
+    const email = parsed.data.email.toLowerCase();
+    const result = await query<{
+      id: string; password_salt: string; password_hash: string; data_json: Record<string, unknown>;
+      family_id: string; account_id: string;
+    }>("SELECT id,password_salt,password_hash,data_json,family_id,account_id FROM users WHERE email=$1", [email]);
+    const user = result.rows[0];
+    const valid = user ? await verifyPassword(parsed.data.password, user.password_salt, user.password_hash) : false;
+    await insertLoginHistory(user?.id || null, valid);
+    if (!user || !valid) return jsonError("Invalid email or passcode.", 401);
+    await createSession(user.id);
+    return NextResponse.json({ success: true, user: { email, familyId: user.family_id, accountId: user.account_id, ...(user.data_json || {}) } });
+  } catch (error) {
+    return serverError(error, "login failed");
+  }
 }

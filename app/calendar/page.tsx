@@ -40,6 +40,9 @@ type CalendarEvent = {
   recurrenceEveryHours?: string;
   reminderMinutes?: string;
   imageDataUrl?: string;
+  visibility?: "family" | "private";
+  createdByName?: string;
+  createdByAccountId?: string;
 };
 
 type VisionExtractResult = {
@@ -212,7 +215,7 @@ function getCategoryStyle(category: EventCategory, darkMode: boolean) {
       };
     case "school":
       return {
-        dot: "bg-emerald-500",
+        dot: "bg-yellow-400",
         badge: darkMode
           ? "bg-emerald-500/15 text-emerald-300"
           : "bg-emerald-50 text-emerald-700",
@@ -281,6 +284,7 @@ function CalendarPageContent() {
     "all" | EventCategory
   >("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -445,10 +449,6 @@ function CalendarPageContent() {
     });
   }, [selectedDate, prefs.weekStartDay]);
 
-  const selectedMember =
-    familyMembers.find((member: FamilyMember) => member.id === selectedMemberId) ??
-    familyMembers[0];
-
   const selectedDayEvents = useMemo(() => {
     const events = (getEventsForDate?.(
       selectedDate,
@@ -470,26 +470,6 @@ function CalendarPageContent() {
       []) as CalendarEvent[];
     return filterEventsForMemberView(events, selectedMemberId);
   }, [getUpcomingEvents, todayKey, selectedMemberId]);
-
-  const eventCountByDate = useMemo(() => {
-    const map = new Map<string, number>();
-
-    monthCells.forEach((cell) => {
-      const key = formatDateKey(cell.date);
-      const count = filterEventsForMemberView((( 
-        getEventsForDate?.(key, selectedMemberId, selectedCategoryFilter, searchTerm) || []
-      ) as CalendarEvent[]), selectedMemberId).length;
-      map.set(key, count);
-    });
-
-    return map;
-  }, [
-    monthCells,
-    getEventsForDate,
-    selectedMemberId,
-    selectedCategoryFilter,
-    searchTerm,
-  ]);
 
   const spanningEventByDate = useMemo(() => {
     const map = new Map<string, boolean>();
@@ -985,11 +965,11 @@ function CalendarPageContent() {
                 isDarkMode ? "text-slate-500" : "text-slate-400"
               )}
             >
-              For:{" "}
+              For{" "}
               {familyMembers
                 .filter((member: FamilyMember) => event.memberIds.includes(member.id))
                 .map((member: FamilyMember) => member.name)
-                .join(", ") || "Family"}
+                .join(", ") || "Family"} · by {event.createdByName || "Family member"}
             </p>
 
             {event.location ? (
@@ -1066,12 +1046,16 @@ function CalendarPageContent() {
               <h1 className="text-lg font-semibold">Calendar</h1>
             </div>
 
-            <button
-              onClick={openCreateEvent}
-              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
-            >
-              + Event
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSearchPanel(true)}
+                aria-label="Search calendar events"
+                className={cn("rounded-full border px-3 py-2 text-sm", isDarkMode ? "border-slate-700 bg-slate-900 text-slate-200" : "border-slate-200 bg-white text-slate-700")}
+              >
+                🔍
+              </button>
+              <button onClick={openCreateEvent} className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">+ Event</button>
+            </div>
           </div>
 
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -1225,7 +1209,10 @@ function CalendarPageContent() {
                   const key = formatDateKey(cell.date);
                   const isSelected = key === selectedDate;
                   const isToday = key === todayKey;
-                  const count = eventCountByDate.get(key) ?? 0;
+                  const dots = filterEventsForMemberView(
+                    ((getEventsForDate?.(key, selectedMemberId, selectedCategoryFilter, searchTerm) || []) as CalendarEvent[]),
+                    selectedMemberId
+                  ).slice(0, 3);
                   const hasSpan = spanningEventByDate.get(key);
 
                   return (
@@ -1261,29 +1248,10 @@ function CalendarPageContent() {
                         </span>
                       </div>
 
-                      <div className="mt-2 flex items-center gap-1">
-                        {count > 0 ? (
-                          <>
-                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                            <span
-                              className={cn(
-                                "text-[10px]",
-                                isDarkMode ? "text-slate-400" : "text-slate-500"
-                              )}
-                            >
-                              {count}
-                            </span>
-                          </>
-                        ) : (
-                          <span
-                            className={cn(
-                              "text-[10px]",
-                              isDarkMode ? "text-slate-700" : "text-slate-300"
-                            )}
-                          >
-                            —
-                          </span>
-                        )}
+                      <div className="mt-2 flex h-2 items-center gap-1" aria-label={`${dots.length} visible events`}>
+                        {dots.map((event, index) => (
+                          <span key={`${event.id}-${index}`} className={cn("h-1.5 w-1.5 rounded-full", getCategoryStyle(event.category, isDarkMode).dot)} />
+                        ))}
                       </div>
                       {hasSpan ? (
                         <div className="mt-1 h-1 w-full rounded-full bg-emerald-400/70" />
@@ -1469,6 +1437,28 @@ function CalendarPageContent() {
             </div>
           </section>
         </div>
+
+        {showSearchPanel ? (
+          <div className="fixed inset-0 z-40 bg-black/40">
+            <div className={cn("mx-auto h-full w-full max-w-[430px] overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]", isDarkMode ? "bg-slate-950" : "bg-white")}>
+              <div className="sticky top-0 z-10 mb-3 flex items-center gap-2 bg-inherit py-1">
+                <button onClick={() => setShowSearchPanel(false)} className={cn("rounded-full border px-3 py-2 text-sm", isDarkMode ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white")}>← Back</button>
+                <input autoFocus value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search events" className={inputClass} />
+              </div>
+              <div className="space-y-3">
+                {filterEventsForMemberView(
+                  ((store.events || []) as CalendarEvent[]).filter((event) => `${event.title} ${event.notes || ""} ${event.location || ""}`.toLowerCase().includes(searchTerm.trim().toLowerCase())),
+                  selectedMemberId
+                ).map((event) => (
+                  <button key={`${event.id}-${event.date}`} onClick={() => { setShowSearchPanel(false); setSelectedDate(event.date); openEditEvent(event); }} className={cn("w-full rounded-2xl border p-3 text-left", isDarkMode ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white")}>
+                    <div className="flex items-center gap-2"><span className={cn("h-2 w-2 rounded-full", getCategoryStyle(event.category, isDarkMode).dot)} /><span className="text-sm font-semibold">{event.title}</span></div>
+                    <div className={cn("mt-1 text-xs", isDarkMode ? "text-slate-400" : "text-slate-500")}>{formatFriendlyDate(event.date, prefs.dateFormat)} · {event.allDay ? "All day" : formatDisplayTime(event.time, prefs.timeFormat)} · by {event.createdByName || "Family member"}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <BottomTabBar active="calendar" darkMode={isDarkMode} />
 
